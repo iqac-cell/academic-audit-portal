@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\Route;
 // dashboard itself is the root.
 if (config('academic-audit.route_prefix') !== '') {
     Route::redirect('/', '/'.config('academic-audit.route_prefix'));
+} elseif ($subPath = trim((string) parse_url(config('app.url'), PHP_URL_PATH), '/')) {
+    // Under a sub-application the bare URL without trailing slash (".../academic-audit")
+    // is not recognised as the application root; send it to the root with the slash.
+    Route::get($subPath, fn () => redirect(rtrim(config('app.url'), '/').'/'));
 }
 
 Route::middleware('guest')->group(function () {
