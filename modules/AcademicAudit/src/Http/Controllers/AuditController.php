@@ -1,0 +1,26 @@
+<?php
+
+namespace Mmmut\AcademicAudit\Http\Controllers;
+
+use Mmmut\AcademicAudit\Models\Audit;
+use Mmmut\AcademicAudit\Models\Entry;
+use Mmmut\AcademicAudit\Services\ScoreService;
+
+class AuditController extends Controller
+{
+    public function show(Audit $audit, ScoreService $scores)
+    {
+        $this->viewable($audit);
+        $eval = $scores->evaluate($audit);
+        $pending = Entry::where('audit_id', $audit->id)->where('status', Entry::PENDING)->get()->groupBy('parameter_code')->map->count();
+
+        return $this->view('audit.show', [
+            'audit' => $audit,
+            'eval' => $eval,
+            'summary' => $scores->summary($audit, $eval),
+            'pending' => $pending,
+            'attachments' => $audit->attachments()->get()->groupBy('slot'),
+            'logs' => $audit->logs()->with('user')->limit(15)->get(),
+        ]);
+    }
+}
