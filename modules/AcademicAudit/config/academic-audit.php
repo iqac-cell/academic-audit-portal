@@ -1,7 +1,8 @@
 <?php
 
 return [
-    // URL prefix and route-name prefix of the module.
+    // URL prefix of the module. Set ACADEMIC_AUDIT_PREFIX= (empty) when the whole site
+    // already lives under a sub-path such as https://sdg.mmmut.ac.in/academic-audit.
     'route_prefix' => env('ACADEMIC_AUDIT_PREFIX', 'academic-audit'),
 
     // Middleware applied to all module routes. When merged into the IQAC project,

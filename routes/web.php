@@ -3,7 +3,12 @@
 use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/'.config('academic-audit.route_prefix'));
+// When the module has its own prefix, send the site root to it. With an empty prefix
+// (portal hosted as an IIS sub-application, e.g. sdg.mmmut.ac.in/academic-audit) the
+// dashboard itself is the root.
+if (config('academic-audit.route_prefix') !== '') {
+    Route::redirect('/', '/'.config('academic-audit.route_prefix'));
+}
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'showLogin'])->name('login');

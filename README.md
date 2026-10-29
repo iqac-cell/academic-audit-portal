@@ -97,6 +97,23 @@ The same actions are available in the UI under **Administration**.
 
 The schema avoids MSSQL pitfalls: no enum columns, a single cascade path per table, and JSON stored as `nvarchar(max)`.
 
+## Hosting under another site's URL (IIS sub-application)
+
+To serve the portal at `https://sdg.mmmut.ac.in/academic-audit` without copying it into the SDG folder:
+
+1. In IIS Manager, right-click the SDG site and choose **Add Application**. Set Alias `academic-audit`, a separate application pool (No Managed Code),
+   and Physical path `C:\sites\academic-audit-portal\public`.
+2. In `.env`:
+   ```
+   APP_URL=https://sdg.mmmut.ac.in/academic-audit
+   ACADEMIC_AUDIT_PREFIX=
+   SESSION_COOKIE=academic_audit_session
+   SESSION_PATH=/academic-audit
+   ```
+3. Run `php artisan config:cache` and `php artisan route:cache`.
+
+`public/web.config` clears the parent site's rewrite rules, so SDG's own rules do not capture `/academic-audit/*` requests.
+
 ## Merging into the IQAC project
 
 1. Copy `modules/AcademicAudit` into the IQAC project. Add these to its `composer.json` autoload:
