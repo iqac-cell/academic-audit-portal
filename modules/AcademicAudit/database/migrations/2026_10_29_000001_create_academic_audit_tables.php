@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * All tables are prefixed aa_ so the module can be merged into the IQAC database.
- * MSSQL notes: no enum columns, no multiple cascade paths (only one cascading FK
+ * MSSQL notes: no enum columns, no ON DELETE RESTRICT (unsupported by SQL Server, use NO ACTION) and no multiple cascade paths (only one cascading FK
  * chain per table, the rest restrict / set null), json stored as nvarchar(max).
  */
 return new class extends Migration
@@ -96,7 +96,7 @@ return new class extends Migration
         Schema::create('aa_audits', function (Blueprint $t) {
             $t->id();
             $t->foreignId('cycle_id')->constrained('aa_cycles')->cascadeOnDelete();
-            $t->foreignId('department_id')->constrained('aa_departments')->restrictOnDelete();
+            $t->foreignId('department_id')->constrained('aa_departments')->noActionOnDelete();
             $t->string('status', 20)->default('draft');
             $t->unsignedBigInteger('hod_user_id')->nullable();
             $t->unsignedBigInteger('auditor1_user_id')->nullable();
