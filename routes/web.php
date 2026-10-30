@@ -9,9 +9,11 @@ use Illuminate\Support\Facades\Route;
 if (config('academic-audit.route_prefix') !== '') {
     Route::redirect('/', '/'.config('academic-audit.route_prefix'));
 } elseif ($subPath = trim((string) parse_url(config('app.url'), PHP_URL_PATH), '/')) {
-    // Under a sub-application the bare URL without trailing slash (".../academic-audit")
-    // is not recognised as the application root; send it to the root with the slash.
-    Route::get($subPath, fn () => redirect(rtrim(config('app.url'), '/').'/'));
+    // Under a sub-application IIS may hand over the application root as ".../academic-audit"
+    // (with or without slash, depending on the parent site's rewrite rules). Serve the
+    // dashboard directly instead of redirecting, so no redirect loop can form.
+    Route::get($subPath, [\Mmmut\AcademicAudit\Http\Controllers\DashboardController::class, 'index'])
+        ->middleware(array_diff(config('academic-audit.middleware'), ['web']));
 }
 
 Route::middleware('guest')->group(function () {
