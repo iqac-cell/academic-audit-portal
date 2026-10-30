@@ -22,7 +22,10 @@ return [
     // Source for pre-filling audit tables. Replace with IqacPrefillProvider after merge.
     'prefill_provider' => \Mmmut\AcademicAudit\Providers\NullPrefillProvider::class,
 
-    // Disk + folder for proofs and annexures.
+    // Reads proof documents for "Fill from document" (AI). Swap for a fake in tests.
+    'document_extractor' => \Mmmut\AcademicAudit\Services\Ai\ClaudeDocumentExtractor::class,
+
+    // Disk + folder for proofs and annexures. Upload size / types are set in Admin → Settings.
     'disk' => env('ACADEMIC_AUDIT_DISK', 'local'),
     'upload_dir' => 'academic-audit',
     'max_upload_kb' => 10240,

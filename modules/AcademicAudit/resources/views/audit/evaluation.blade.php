@@ -61,6 +61,7 @@
                                 <td class="small">
                                     <a href="{{ $e['definition']['columns'] ? route('audit.items', [$audit, $code]) : route('audit.inputs', $audit) }}" class="text-decoration-none">{{ $e['parameter']->title }}</a>
                                     @if($e['definition']['columns'])<span class="text-muted">({{ $e['rows'] }} rows)</span>@endif
+                                    @if($issueCounts[$code] ?? 0)<a href="{{ route('audit.items', [$audit, $code]) }}" class="badge bg-warning text-dark text-decoration-none" title="Data quality checks">{{ $issueCounts[$code] }} check(s)</a>@endif
                                 </td>
                                 <td class="text-end">@marks($e['parameter']->max_marks)</td>
                                 <td class="small text-nowrap">{{ $e['definition']['metric']['symbol'] }}: {{ \Mmmut\AcademicAudit\Support\Fmt::indicator($e) }}</td>

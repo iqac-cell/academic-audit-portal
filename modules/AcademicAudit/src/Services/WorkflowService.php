@@ -12,7 +12,7 @@ use Mmmut\AcademicAudit\Models\Score;
  */
 class WorkflowService
 {
-    public function __construct(private ScoreService $scores) {}
+    public function __construct(private ScoreService $scores, private Notifier $notifier) {}
 
     public function submit(Audit $audit): void
     {
@@ -24,6 +24,7 @@ class WorkflowService
         $this->scores->store($audit);
         $audit->update(['status' => Audit::SUBMITTED, 'submitted_at' => now(), 'hod_user_id' => auth()->id()]);
         $audit->log('submitted', 'Submitted to IQAC');
+        $this->notifier->submitted($audit);
     }
 
     public function returnToHod(Audit $audit, string $remark): void
@@ -31,6 +32,7 @@ class WorkflowService
         $this->expect($audit, [Audit::SUBMITTED, Audit::VERIFIED]);
         $audit->update(['status' => Audit::RETURNED, 'iqac_remark' => $remark, 'verified_at' => null]);
         $audit->log('returned', $remark);
+        $this->notifier->returned($audit);
     }
 
     public function verify(Audit $audit): void
@@ -42,6 +44,7 @@ class WorkflowService
         Score::where('audit_id', $audit->id)->whereNull('iqac_status')->update(['iqac_status' => 'verified']);
         $audit->update(['status' => Audit::VERIFIED, 'verified_at' => now()]);
         $audit->log('verified', 'Verified by IQAC, forwarded to auditors');
+        $this->notifier->verified($audit);
     }
 
     public function auditorDone(Audit $audit, int $slot): void

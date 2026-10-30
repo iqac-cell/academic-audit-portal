@@ -18,7 +18,7 @@
                     @foreach(\Mmmut\AcademicAudit\Support\Catalogue::SCALARS as $key => $s)
                         <tr @isset($anchors[$key]) id="{{ $anchors[$key] }}" @endisset>
                             <td><label for="s_{{ $key }}" class="small">{{ $s['label'] }}</label>
-                                @if(isset($suggested[$key]))<div class="small text-muted">From faculty directory: <strong>{{ $suggested[$key] }}</strong></div>@endif</td>
+                                @if(isset($suggested[$key]))<div class="small text-muted">{{ $key === 'regular_faculty' ? 'From faculty directory' : 'Previous year' }}: <strong>{{ $suggested[$key] }}</strong></div>@endif</td>
                             <td>
                                 @if($s['type'] === 'yn')
                                     <select id="s_{{ $key }}" name="{{ $key }}" class="form-select form-select-sm">

@@ -14,7 +14,9 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 
 class EntryController extends Controller
 {
-    public function index(Request $request, Audit $audit, string $code, ScoreService $scores, PrefillProvider $prefill)
+    public function index(Request $request, Audit $audit, string $code, ScoreService $scores, PrefillProvider $prefill,
+        \Mmmut\AcademicAudit\Services\SettingsService $settings, \Mmmut\AcademicAudit\Services\Ai\DataQualityChecker $quality,
+        \Mmmut\AcademicAudit\Services\Ai\ScoreAdvisor $advisor)
     {
         $this->viewable($audit);
         $def = $this->definition($code);
@@ -43,7 +45,13 @@ class EntryController extends Controller
             'facultyView' => $facultyView,
             'programs' => ItemForm::programs($audit),
             'facultyNames' => ItemForm::facultyNames($audit),
-            'prefillName' => in_array($code, $prefill->supports()) ? $prefill->name() : null,
+            'prefillName' => in_array($code, $prefill->supports()) ? (method_exists($prefill, 'nameFor') ? $prefill->nameFor($code) : $prefill->name()) : null,
+            'issues' => $settings->enabled('ai.quality_checks')
+                ? $quality->check($audit)->where('code', $code)->filter(fn ($i) => ! $facultyView || $entries->contains('id', $i['entry_id']))->values()
+                : collect(),
+            'suggestion' => $settings->enabled('ai.suggestions') ? $advisor->suggestions($audit)->get($code) : null,
+            'autofill' => $settings->enabled('ai.document_autofill'),
+            'proofMode' => $settings->get('workflow.proof_mode'),
             'attachments' => $audit->attachments()->where('slot', $code)->get(),
         ]);
     }
@@ -56,7 +64,7 @@ class EntryController extends Controller
         $asHod = $access->canEdit($audit);
         abort_unless($asHod || ($def['faculty'] && $access->canContribute($audit)), 403);
 
-        $request->validate(ItemForm::rules($def) + $this->proofRule(), [], ItemForm::attributes($def));
+        $request->validate(ItemForm::rules($def) + $this->proofRule($request, $audit, $code), [], ItemForm::attributes($def));
         $data = ItemForm::clean($def, $request->input('data', []));
 
         $faculty = $asHod ? null : $access->faculty();
@@ -80,7 +88,7 @@ class EntryController extends Controller
         $this->viewable($audit);
         abort_unless($this->canModify($audit, $entry), 403);
         $def = $this->definition($entry->parameter_code);
-        $request->validate(ItemForm::rules($def) + $this->proofRule(), [], ItemForm::attributes($def));
+        $request->validate(ItemForm::rules($def) + $this->proofRule($request, $audit, $entry->parameter_code, $entry), [], ItemForm::attributes($def));
 
         $entry->data = ItemForm::clean($def, $request->input('data', []));
         if ($entry->status === Entry::REJECTED && ! $this->access()->canEdit($audit)) {
@@ -104,7 +112,7 @@ class EntryController extends Controller
     }
 
     /** HOD approves / rejects a faculty contribution. */
-    public function review(Request $request, Audit $audit, Entry $entry)
+    public function review(Request $request, Audit $audit, Entry $entry, \Mmmut\AcademicAudit\Services\Notifier $notifier)
     {
         $this->editable($audit);
         $data = $request->validate(['decision' => 'required|in:approve,reject', 'remark' => 'nullable|string|max:500']);
@@ -112,6 +120,9 @@ class EntryController extends Controller
             'status' => $data['decision'] === 'approve' ? Entry::APPROVED : Entry::REJECTED,
             'remark' => $data['remark'] ?? null,
         ]);
+        if ($entry->source === 'faculty') {
+            $notifier->entryReviewed($entry);
+        }
         return back()->with('status', $data['decision'] === 'approve' ? 'Row approved.' : 'Row rejected.');
     }
 
@@ -139,12 +150,13 @@ class EntryController extends Controller
                 'faculty_id' => $row['faculty_id'] ?? null,
                 'created_by' => $this->access()->userId(),
                 'status' => Entry::APPROVED,
-                'source' => 'iqac',
+                'source' => $row['source'] ?? 'iqac',
                 'source_ref' => $row['source_ref'],
             ]);
             $added++;
         }
-        return back()->with('status', "{$added} rows prefilled from {$prefill->name()}. Please verify them.");
+        $source = method_exists($prefill, 'nameFor') ? $prefill->nameFor($code) : $prefill->name();
+        return back()->with('status', "{$added} rows prefilled from {$source}. Please verify them.");
     }
 
     public function template(Audit $audit, string $code)
@@ -221,14 +233,24 @@ class EntryController extends Controller
             && $entry->status !== Entry::APPROVED;
     }
 
-    private function proofRule(): array
+    private function proofRule(Request $request, Audit $audit, string $code, ?Entry $entry = null): array
     {
-        return ['proof' => 'nullable|file|max:'.config('academic-audit.max_upload_kb').'|mimes:'.config('academic-audit.upload_mimes')];
+        $required = app(\Mmmut\AcademicAudit\Services\SettingsService::class)->get('workflow.proof_mode') === 'require'
+            && ! $entry?->proof_path
+            && ! $request->filled('ai_proof_token')
+            && ! $audit->attachments()->where('slot', $code)->exists();
+        return ['proof' => ($required ? 'required' : 'nullable').'|file|max:'.config('academic-audit.max_upload_kb').'|mimes:'.config('academic-audit.upload_mimes')];
     }
 
     private function saveProof(Request $request, Audit $audit, Entry $entry): void
     {
         if (! $request->hasFile('proof')) {
+            if ($request->filled('ai_proof_token') && ($path = AiController::claimProof((string) $request->ai_proof_token, $audit))) {
+                if ($entry->proof_path) {
+                    Storage::disk(config('academic-audit.disk'))->delete($entry->proof_path);
+                }
+                $entry->update(['proof_path' => $path]);
+            }
             return;
         }
         $disk = Storage::disk(config('academic-audit.disk'));

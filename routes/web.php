@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\PasswordResetController;
 use Illuminate\Support\Facades\Route;
 
 // When the module has its own prefix, send the site root to it. With an empty prefix
@@ -19,6 +20,11 @@ if (config('academic-audit.route_prefix') !== '') {
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+
+    Route::get('forgot-password', [PasswordResetController::class, 'request'])->name('password.request');
+    Route::post('forgot-password', [PasswordResetController::class, 'send'])->middleware('throttle:5,10')->name('password.email');
+    Route::get('forgot-password/verify', [PasswordResetController::class, 'verifyForm'])->name('password.otp.verify');
+    Route::post('forgot-password/verify', [PasswordResetController::class, 'reset'])->middleware('throttle:10,10')->name('password.otp.reset');
 });
 
 Route::middleware('auth')->group(function () {

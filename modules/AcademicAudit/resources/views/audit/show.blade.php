@@ -17,7 +17,8 @@
                 </ol>
                 <div class="d-flex flex-wrap gap-2">
                     @if($access->canEdit($audit))
-                        <form method="post" action="{{ route('audit.workflow', [$audit, 'submit']) }}" onsubmit="return confirm('Submit the audit to IQAC? You will not be able to edit unless IQAC returns it.')">
+                        @php($errCount = $issues?->where('severity', 'error')->count() ?? 0)
+                        <form method="post" action="{{ route('audit.workflow', [$audit, 'submit']) }}" onsubmit="return confirm(@json(($errCount ? $errCount.' data-quality error(s) are still open. ' : '').'Submit the audit to IQAC? You will not be able to edit unless IQAC returns it.'))">
                             @csrf <button class="btn btn-success btn-sm"><i class="bi bi-send"></i> Submit to IQAC</button>
                         </form>
                     @endif
@@ -62,6 +63,35 @@
                 </tbody>
             </table>
         </div>
+
+        @if($suggestions && $suggestions->isNotEmpty())
+            <div class="card shadow-sm mb-3 border-success">
+                <div class="card-header bg-white"><strong><i class="bi bi-lightbulb text-success"></i> Top actions to gain marks</strong>
+                    <span class="small text-muted">— based on the evaluation scheme; enter only genuine activities with proof</span></div>
+                <ul class="list-group list-group-flush small">
+                    @foreach($suggestions->take(8) as $code => $sg)
+                        @php($d = \Mmmut\AcademicAudit\Support\Catalogue::get($code))
+                        <li class="list-group-item d-flex justify-content-between gap-2">
+                            <span><a href="{{ $d['columns'] ? route('audit.items', [$audit, $code]) : route('audit.inputs', $audit) }}"><strong>{{ $code }}</strong> {{ \Illuminate\Support\Str::limit($d['title'], 60) }}</a><br>{{ $sg['message'] }}</span>
+                            @if($sg['gain'] > 0 && ! $sg['missing'])<span class="badge bg-success align-self-start">+@marks($sg['gain'])</span>@endif
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        @if($issues && $issues->isNotEmpty())
+            <div class="card shadow-sm mb-3 border-warning">
+                <div class="card-header bg-white"><strong><i class="bi bi-clipboard-pulse text-warning"></i> Data quality:</strong>
+                    <span class="text-danger">{{ $issues->where('severity', 'error')->count() }} error(s)</span>, {{ $issues->where('severity', 'warning')->count() }} warning(s)</div>
+                <ul class="list-group list-group-flush small">
+                    @foreach($issues->take(12) as $i)
+                        <li class="list-group-item {{ $i['severity'] === 'error' ? 'text-danger' : '' }}"><a href="{{ route('audit.items', [$audit, $i['code']]) }}"><strong>{{ $i['code'] }}</strong></a> {{ $i['message'] }}</li>
+                    @endforeach
+                    @if($issues->count() > 12)<li class="list-group-item text-muted">… and {{ $issues->count() - 12 }} more — open each parameter to see all.</li>@endif
+                </ul>
+            </div>
+        @endif
 
         {{-- Parameters needing attention --}}
         @php($attention = $eval->filter(fn ($e) => $e['missing'] || ($pending[$e['parameter']->code] ?? 0) || $e['score']?->iqac_status === 'returned'))

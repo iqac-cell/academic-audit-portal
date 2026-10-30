@@ -11,7 +11,8 @@ use Mmmut\AcademicAudit\Services\ScoreService;
 /** Evaluation sheet: claimed (HOD) → verification (IQAC) → marks (Auditor-1/2) → awarded. */
 class EvaluationController extends Controller
 {
-    public function show(Audit $audit, ScoreService $scores)
+    public function show(Audit $audit, ScoreService $scores, \Mmmut\AcademicAudit\Services\SettingsService $settings,
+        \Mmmut\AcademicAudit\Services\Ai\DataQualityChecker $quality)
     {
         $this->viewable($audit);
         $eval = $scores->evaluate($audit);
@@ -25,6 +26,7 @@ class EvaluationController extends Controller
             'canMark' => $this->access()->canMark($audit),
             'canVerify' => $this->access()->canVerify($audit),
             'canClaim' => $this->access()->canEdit($audit),
+            'issueCounts' => $settings->enabled('ai.quality_checks') ? $quality->check($audit)->groupBy('code')->map->count() : collect(),
             'auditors' => $this->access()->isIqac()
                 ? $userModel::whereIn('id', UserRole::where('role', UserRole::AUDITOR)->pluck('user_id'))->orderBy('name')->get()
                 : collect(),
@@ -80,7 +82,7 @@ class EvaluationController extends Controller
         return back()->with('status', 'Marks saved. Use "Finalise my marks" when complete.');
     }
 
-    public function auditors(Request $request, Audit $audit)
+    public function auditors(Request $request, Audit $audit, \Mmmut\AcademicAudit\Services\Notifier $notifier)
     {
         $this->iqac();
         $auditorIds = UserRole::where('role', UserRole::AUDITOR)->pluck('user_id')->all();
@@ -88,8 +90,10 @@ class EvaluationController extends Controller
             'auditor1_user_id' => ['nullable', 'in:'.implode(',', $auditorIds ?: [0])],
             'auditor2_user_id' => ['nullable', 'in:'.implode(',', $auditorIds ?: [0]), 'different:auditor1_user_id'],
         ]);
+        $before = [$audit->auditor1_user_id, $audit->auditor2_user_id];
         $audit->update($data);
         $audit->log('auditors', 'Auditors assigned');
+        $notifier->auditorsAssigned($audit, array_values(array_diff(array_filter([$audit->auditor1_user_id, $audit->auditor2_user_id]), $before)));
         return back()->with('status', 'Auditors assigned.');
     }
 }

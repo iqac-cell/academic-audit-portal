@@ -68,6 +68,6 @@ class BasicInfoController extends Controller
             }
         }
         $audit->update(['basic_info' => $current]);
-        return back()->with('status', 'Empty fields filled from '.$prefill->name().'.');
+        return back()->with('status', 'Empty fields filled from '.$prefill->name().'. Please review before saving.');
     }
 }

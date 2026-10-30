@@ -56,6 +56,48 @@ Denominators that the format does not define are entered by the HOD on the *Deno
 graduating students as per sanctioned intake, eligible students for internship, faculty eligible for seed money,
 PhD seats, and recognised guides. The number of regular faculty is taken from the faculty directory, and the HOD can override it.
 
+## Roles and the role switcher
+
+One person can hold several roles: Faculty, HOD (of a department), IQAC and Academic Auditor. They log in once and choose
+the role to work in from the switcher at the top right. Every permission follows the **active role only**. For example, a
+HOD who is also an auditor sees the departments assigned to them for audit only while working as Auditor. A faculty
+record linked to the login counts as the Faculty role. IQAC adds roles to a person in Administration → Users & roles.
+
+## Portal settings (IQAC → Administration → Portal settings)
+
+| Tab | What it controls |
+|---|---|
+| General | Portal title, university name, contact email and notice on the login page |
+| Workflow & uploads | Faculty contributions on/off, whether proof is required per row, upload size and types, auto-closing of cycles |
+| Email (SMTP) | University SMTP or Gmail (use an App Password), plus a test-mail button |
+| Login & password | "Forgot password" with an email OTP (digits, expiry, attempts), minimum password length, forced change for new accounts |
+| Notifications | Emails on submit, return, verify, auditor assignment, and faculty row approval/rejection; deadline reminder days |
+| AI assistance | Master switch and each AI feature, Claude API key, model, proxy, daily limit, connection test, usage table |
+
+**Every new feature is off by default.** Secrets (SMTP password, API key) are stored encrypted with `APP_KEY`. If `APP_KEY`
+changes, enter the secrets again.
+
+### Daily task (reminders, auto-close)
+
+Schedule once a day with Windows Task Scheduler:
+
+```
+php C:\sites\academic-audit-portal\artisan audit:remind
+```
+
+### AI assistance
+
+| Feature | Where it runs | What it does |
+|---|---|---|
+| Data quality checks | Inside the portal (offline) | Flags duplicates, dates/years outside the academic year, CGPA > 10, N1 > N, placements > graduates, FDPs shorter than a week, names not in the faculty list, bad links/ISSN, missing proof and missing denominators. Shown on item pages, the overview, before submission and to IQAC. |
+| Suggestions to gain marks | Inside the portal (offline) | For each parameter, explains the next slab of the evaluation scheme and what it needs ("1 more paper → +10"). |
+| Previous-year prefill | Inside the portal (offline) | Copies basic information, memberships, running projects (without amounts), the mentor list and the citation faculty list from last year's audit, marked "previous". |
+| Fill from document | Claude API (online) | The user uploads a certificate/paper/letter. The fields are read with Claude (structured output) and put in the form for the user to check before saving. The file becomes the row's proof. |
+
+"Fill from document" needs an Anthropic API key and outbound HTTPS from the server to `api.anthropic.com` (or a proxy).
+Uploaded documents are sent to Anthropic for processing. Use is logged in `aa_ai_logs` and limited per user per day.
+Nothing an AI feature produces is saved or scored without the user confirming it.
+
 ## Installation (development)
 
 ```bash
@@ -113,6 +155,18 @@ To serve the portal at `https://sdg.mmmut.ac.in/academic-audit` without copying 
 3. Run `php artisan config:cache` and `php artisan route:cache`.
 
 `public/web.config` clears the parent site's rewrite rules, so SDG's own rules do not capture `/academic-audit/*` requests.
+
+## Updating the server
+
+```powershell
+git pull
+composer install --no-dev
+php artisan migrate --force
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+Restart-WebAppPool -Name "AcademicAudit"
+```
 
 ## Merging into the IQAC project
 

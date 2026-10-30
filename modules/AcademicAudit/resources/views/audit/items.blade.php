@@ -13,6 +13,25 @@
 
         @include('audit::partials.metric-box', ['e' => $eval])
 
+        @if($suggestion)
+            <div class="alert alert-light border-success py-2 small"><i class="bi bi-lightbulb text-success"></i> <strong>Suggestion:</strong> {{ $suggestion['message'] }}
+                <span class="text-muted">Only enter genuine activities with proof.</span></div>
+        @endif
+        @if($issues->isNotEmpty())
+            @php($issueRows = $issues->pluck('entry_id')->filter()->flip())
+            <div class="alert alert-warning py-2 small">
+                <strong><i class="bi bi-clipboard-pulse"></i> Data checks ({{ $issues->count() }})</strong>
+                <ul class="mb-0 ps-3">
+                    @foreach($issues->groupBy('message')->take(12) as $message => $group)
+                        @php($rowNos = $group->pluck('entry_id')->filter()->map(fn ($id) => $entries->search(fn ($e) => $e->id === $id) + 1)->sort()->values())
+                        <li class="{{ $group->first()['severity'] === 'error' ? 'text-danger' : '' }}">
+                            @if($rowNos->isNotEmpty()){{ $rowNos->count() > 1 ? 'Rows' : 'Row' }} {{ $rowNos->implode(', ') }}: @endif{{ $message }}
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
         <div class="card shadow-sm mb-3">
             <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <strong>{{ $facultyView ? 'My entries' : 'Entries' }} ({{ $entries->count() }})</strong>
@@ -47,7 +66,7 @@
                     </thead>
                     <tbody>
                     @forelse($entries as $i => $row)
-                        <tr class="{{ $row->status === 'pending' ? 'table-warning' : ($row->status === 'rejected' ? 'table-danger' : '') }}">
+                        <tr class="{{ $row->status === 'pending' ? 'table-warning' : ($row->status === 'rejected' ? 'table-danger' : '') }}" @if(isset($issueRows[$row->id])) style="box-shadow: inset 4px 0 0 #fd7e14" title="See data checks above" @endif>
                             <td>{{ $i + 1 }}</td>
                             @foreach($def['columns'] as $c)
                                 @php($v = \Mmmut\AcademicAudit\Support\ItemForm::display($c, $row->data[$c['key']] ?? null))
@@ -88,9 +107,20 @@
             <div class="card shadow-sm mb-3" id="form">
                 <div class="card-header bg-white"><strong>{{ $editing ? 'Edit row' : 'Add row' }}</strong></div>
                 <div class="card-body">
-                    <form method="post" enctype="multipart/form-data" action="{{ $editing ? route('audit.entries.update', [$audit, $editing]) : route('audit.items.store', [$audit, $code]) }}">
+                    @if($autofill && ! $editing)
+                        <div class="border rounded p-2 mb-3 bg-light" id="aiBox">
+                            <div class="small fw-semibold mb-1"><i class="bi bi-stars text-primary"></i> Fill from document <span class="text-muted fw-normal">(certificate, sanction letter, paper — PDF or photo)</span></div>
+                            <div class="d-flex gap-2">
+                                <input type="file" id="aiFile" accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-control form-control-sm">
+                                <button type="button" id="aiBtn" class="btn btn-sm btn-primary text-nowrap">Read document</button>
+                            </div>
+                            <div id="aiMsg" class="small mt-1"></div>
+                        </div>
+                    @endif
+                    <form method="post" enctype="multipart/form-data" id="rowForm" action="{{ $editing ? route('audit.entries.update', [$audit, $editing]) : route('audit.items.store', [$audit, $code]) }}">
                         @csrf
                         @if($editing) @method('put') @endif
+                        <input type="hidden" name="ai_proof_token" id="aiProofToken" value="{{ old('ai_proof_token') }}">
                         <div class="row g-2">
                             @foreach($def['columns'] as $i => $c)
                                 @php($default = $editing ? ($editing->data[$c['key']] ?? null) : ($facultyView && $c['key'] === 'faculty' ? $access->faculty()?->display_name : null))
@@ -100,7 +130,7 @@
                                 </div>
                             @endforeach
                             <div class="col-md-4">
-                                <label class="form-label">Proof document (optional)</label>
+                                <label class="form-label">Proof document {!! $proofMode === 'require' ? '<span class="text-danger">*</span>' : '(optional)' !!}</label>
                                 <input type="file" name="proof" class="form-control form-control-sm">
                             </div>
                         </div>
@@ -111,6 +141,36 @@
                     </form>
                 </div>
             </div>
+            @if($autofill && ! $editing)
+                @push('scripts')
+                <script>
+                document.getElementById('aiBtn')?.addEventListener('click', async () => {
+                    const file = document.getElementById('aiFile').files[0];
+                    const msg = document.getElementById('aiMsg');
+                    if (!file) { msg.textContent = 'Choose a PDF or image first.'; return; }
+                    const btn = document.getElementById('aiBtn');
+                    btn.disabled = true; msg.className = 'small mt-1 text-muted'; msg.textContent = 'Reading the document… this can take up to a minute.';
+                    const fd = new FormData(); fd.append('document', file);
+                    try {
+                        const res = await fetch(@json(route('audit.items.extract', [$audit, $code])), {
+                            method: 'POST', body: fd,
+                            headers: {'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json'},
+                        });
+                        const json = await res.json();
+                        if (!res.ok) { msg.className = 'small mt-1 text-danger'; msg.textContent = json.message || 'Could not read the document.'; return; }
+                        for (const [key, value] of Object.entries(json.data || {})) {
+                            const el = document.getElementById('f_' + key);
+                            if (el) { el.value = value; el.classList.add('border-primary', 'bg-primary-subtle'); }
+                        }
+                        document.getElementById('aiProofToken').value = json.proof_token || '';
+                        msg.className = 'small mt-1 text-success'; msg.textContent = json.message + ' The document will be attached as proof when you save.';
+                    } catch (e) {
+                        msg.className = 'small mt-1 text-danger'; msg.textContent = 'Network error while reading the document.';
+                    } finally { btn.disabled = false; }
+                });
+                </script>
+                @endpush
+            @endif
             <datalist id="dl_programs">@foreach($programs as $p)<option value="{{ $p }}">@endforeach</datalist>
             <datalist id="dl_faculty">@foreach($facultyNames as $f)<option value="{{ $f }}">@endforeach</datalist>
         @endif

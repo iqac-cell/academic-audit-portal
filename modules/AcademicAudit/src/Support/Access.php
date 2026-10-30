@@ -4,13 +4,25 @@ namespace Mmmut\AcademicAudit\Support;
 
 use Illuminate\Support\Collection;
 use Mmmut\AcademicAudit\Models\Audit;
+use Mmmut\AcademicAudit\Models\Department;
 use Mmmut\AcademicAudit\Models\Faculty;
 use Mmmut\AcademicAudit\Models\UserRole;
 
-/** Role checks for the logged-in user. Resolved per request. */
+/**
+ * Role checks for the logged-in user.
+ *
+ * A person may hold several roles (e.g. Faculty + HOD + Auditor). Exactly one of them is
+ * "active" at a time (chosen with the role switcher, kept in the session) and every
+ * permission check looks at the active role only.
+ */
 class Access
 {
-    private ?Collection $roles = null;
+    public const SESSION_KEY = 'audit.active_role';
+
+    /** Default role after login, first match wins. */
+    private const PRIORITY = [UserRole::IQAC, UserRole::HOD, UserRole::AUDITOR, UserRole::FACULTY];
+
+    private ?Collection $available = null;
     private Faculty|false|null $faculty = null;
     private ?int $cachedFor = null;
 
@@ -18,7 +30,7 @@ class Access
     private function fresh(): void
     {
         if ($this->cachedFor !== $this->userId()) {
-            $this->roles = null;
+            $this->available = null;
             $this->faculty = null;
             $this->cachedFor = $this->userId();
         }
@@ -29,17 +41,78 @@ class Access
         return auth()->id();
     }
 
-    public function roles(): Collection
+    /**
+     * Every role the user holds, as ['key' => 'hod:3', 'role' => 'hod', 'department_id' => 3, 'label' => 'HOD – CSE'].
+     * A linked faculty record counts as a faculty role even without an explicit aa_user_roles row.
+     */
+    public function availableRoles(): Collection
     {
         $this->fresh();
-        return $this->roles ??= $this->userId()
-            ? UserRole::where('user_id', $this->userId())->get()
-            : collect();
+        if ($this->available !== null) {
+            return $this->available;
+        }
+        if (! $this->userId()) {
+            return $this->available = collect();
+        }
+
+        $rows = UserRole::with('department')->where('user_id', $this->userId())->get()
+            ->map(fn (UserRole $r) => [$r->role, $r->department_id, $r->department]);
+        if (($f = $this->faculty()) && ! $rows->contains(fn ($r) => $r[0] === UserRole::FACULTY && $r[1] === $f->department_id)) {
+            $rows->push([UserRole::FACULTY, $f->department_id, $f->department]);
+        }
+
+        return $this->available = $rows
+            ->map(fn ($r) => [
+                'key' => $r[0].':'.($r[1] ?? ''),
+                'role' => $r[0],
+                'department_id' => $r[1],
+                'label' => self::label($r[0], $r[2]),
+            ])
+            ->unique('key')
+            ->sortBy(fn ($r) => array_search($r['role'], self::PRIORITY).'|'.$r['label'])
+            ->values();
+    }
+
+    public static function label(string $role, ?Department $dept): string
+    {
+        $short = ['iqac' => 'IQAC', 'hod' => 'HOD', 'faculty' => 'Faculty', 'auditor' => 'Auditor'][$role] ?? $role;
+        return $dept ? "{$short} – ".($dept->short_name ?: $dept->name) : $short;
+    }
+
+    /** The active role entry, or null when the user has no role at all. */
+    public function active(): ?array
+    {
+        $roles = $this->availableRoles();
+        if ($roles->isEmpty()) {
+            return null;
+        }
+        $key = session(self::SESSION_KEY);
+        return $roles->firstWhere('key', $key) ?? $roles->first();
+    }
+
+    public function switchTo(string $key): bool
+    {
+        if (! $this->availableRoles()->contains('key', $key)) {
+            return false;
+        }
+        session([self::SESSION_KEY => $key]);
+        return true;
+    }
+
+    /** Active role as a collection (kept for callers that list roles). */
+    public function roles(): Collection
+    {
+        return collect(array_filter([$this->active()]));
     }
 
     public function has(string $role): bool
     {
-        return $this->roles()->contains('role', $role);
+        return ($this->active()['role'] ?? null) === $role;
+    }
+
+    public function holds(string $role): bool
+    {
+        return $this->availableRoles()->contains('role', $role);
     }
 
     public function isIqac(): bool
@@ -52,9 +125,19 @@ class Access
         return $this->has(UserRole::AUDITOR);
     }
 
+    public function isFaculty(): bool
+    {
+        return $this->has(UserRole::FACULTY);
+    }
+
+    public function activeDepartmentId(): ?int
+    {
+        return $this->active()['department_id'] ?? null;
+    }
+
     public function hodDepartmentIds(): array
     {
-        return $this->roles()->where('role', UserRole::HOD)->pluck('department_id')->filter()->values()->all();
+        return $this->has(UserRole::HOD) ? array_filter([$this->activeDepartmentId()]) : [];
     }
 
     public function isHodOf(Audit $audit): bool
@@ -64,12 +147,15 @@ class Access
 
     public function isAuditorOf(Audit $audit): bool
     {
-        return $this->userId() && in_array($this->userId(), [$audit->auditor1_user_id, $audit->auditor2_user_id]);
+        return $this->isAuditor() && in_array($this->userId(), [$audit->auditor1_user_id, $audit->auditor2_user_id]);
     }
 
-    /** 1 or 2 when the user is Auditor-1 / Auditor-2 of the audit. */
+    /** 1 or 2 when the user is acting as Auditor-1 / Auditor-2 of the audit. */
     public function auditorSlot(Audit $audit): ?int
     {
+        if (! $this->isAuditor()) {
+            return null;
+        }
         return match ($this->userId()) {
             null => null,
             $audit->auditor1_user_id => 1,
@@ -78,6 +164,7 @@ class Access
         };
     }
 
+    /** Faculty record linked to the user (independent of the active role). */
     public function faculty(): ?Faculty
     {
         $this->fresh();
@@ -93,7 +180,8 @@ class Access
 
     public function isFacultyOf(Audit $audit): bool
     {
-        return $this->faculty()?->department_id === $audit->department_id;
+        return $this->isFaculty() && $this->activeDepartmentId() === $audit->department_id
+            && $this->faculty()?->department_id === $audit->department_id;
     }
 
     public function canView(Audit $audit): bool
@@ -108,7 +196,8 @@ class Access
 
     public function canContribute(Audit $audit): bool
     {
-        return $audit->isEditable() && $audit->cycle->status === 'open' && $this->isFacultyOf($audit);
+        return $audit->isEditable() && $audit->cycle->status === 'open' && $this->isFacultyOf($audit)
+            && app(\Mmmut\AcademicAudit\Services\SettingsService::class)->enabled('workflow.faculty_contributions');
     }
 
     public function canVerify(Audit $audit): bool

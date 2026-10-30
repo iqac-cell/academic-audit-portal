@@ -15,8 +15,14 @@ class AcademicAuditServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../config/academic-audit.php', 'academic-audit');
 
+        $this->app->singleton(Services\SettingsService::class);
         $this->app->singleton(DirectoryProvider::class, fn ($app) => $app->make(config('academic-audit.directory_provider')));
-        $this->app->singleton(PrefillProvider::class, fn ($app) => $app->make(config('academic-audit.prefill_provider')));
+        // configured source (IQAC data after merge) first, then the previous academic year
+        $this->app->singleton(PrefillProvider::class, fn ($app) => new Providers\CompositePrefillProvider([
+            $app->make(config('academic-audit.prefill_provider')),
+            $app->make(Providers\PreviousCyclePrefillProvider::class),
+        ]));
+        $this->app->bind(Services\Ai\DocumentExtractor::class, fn ($app) => $app->make(config('academic-audit.document_extractor')));
         $this->app->scoped(Access::class);
     }
 
@@ -28,7 +34,8 @@ class AcademicAuditServiceProvider extends ServiceProvider
 
         $this->publishes([__DIR__.'/../config/academic-audit.php' => config_path('academic-audit.php')], 'academic-audit-config');
 
-        View::composer('audit::*', fn ($view) => $view->with('access', app(Access::class)));
+        View::composer('audit::*', fn ($view) => $view->with(['access' => app(Access::class), 'settings' => app(Services\SettingsService::class)]));
+        $this->app->booted(fn () => $this->app->make(Services\SettingsService::class)->applyToConfig());
         Blade::directive('marks', fn ($e) => "<?php echo \\Mmmut\\AcademicAudit\\Support\\Fmt::marks({$e}); ?>");
 
         if ($this->app->runningInConsole()) {
@@ -36,6 +43,7 @@ class AcademicAuditServiceProvider extends ServiceProvider
                 Console\ImportErpCommand::class,
                 Console\NewCycleCommand::class,
                 Console\GrantRoleCommand::class,
+                Console\RemindCommand::class,
             ]);
         }
     }

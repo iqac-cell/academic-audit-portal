@@ -22,20 +22,31 @@
 </form>
 <div class="card shadow-sm">
     <table class="table table-sm mb-0 align-middle">
-        <thead class="table-light"><tr><th>Name</th><th>Email</th><th>Role</th><th>Department</th><th></th></tr></thead>
+        <thead class="table-light"><tr><th>Name</th><th>Email</th><th>Roles</th><th></th></tr></thead>
         <tbody>
-        @foreach($roles as $r)
+        @forelse($people as $p)
             <tr>
-                <td>{{ $r->user->name }}</td><td class="small">{{ $r->user->email }}</td>
-                <td><span class="badge bg-{{ ['iqac' => 'danger', 'hod' => 'primary', 'auditor' => 'info', 'faculty' => 'secondary'][$r->role] }}">{{ $labels[$r->role] }}</span></td>
-                <td class="small">{{ $r->department?->name }}</td>
+                <td>{{ $p['user']->name }}</td><td class="small">{{ $p['user']->email }}</td>
+                <td>
+                    @foreach($p['roles'] as $r)
+                        <span class="badge bg-{{ ['iqac' => 'danger', 'hod' => 'primary', 'auditor' => 'info', 'faculty' => 'secondary'][$r->role] }} me-1 mb-1">
+                            {{ $labels[$r->role] }}{{ $r->department ? ' – '.($r->department->short_name ?: $r->department->name) : '' }}
+                            <form class="d-inline" method="post" action="{{ route('audit.admin.roles.destroy', $r) }}" onsubmit="return confirm('Remove this role?')">@csrf @method('delete')<button class="btn btn-link p-0 text-white ms-1" style="font-size:.7rem" title="Remove role"><i class="bi bi-x-lg"></i></button></form>
+                        </span>
+                    @endforeach
+                </td>
                 <td class="text-nowrap">
-                    <form class="d-inline" method="post" action="{{ route('audit.admin.users.reset', $r->user_id) }}" onsubmit="return confirm('Reset password to default?')">@csrf <button class="btn btn-sm btn-outline-secondary py-0">Reset password</button></form>
-                    <form class="d-inline" method="post" action="{{ route('audit.admin.roles.destroy', $r) }}" onsubmit="return confirm('Remove this role?')">@csrf @method('delete')<button class="btn btn-sm btn-outline-danger py-0">Remove role</button></form>
+                    @if($otpEnabled)
+                        <form class="d-inline" method="post" action="{{ route('audit.admin.users.otp', $p['user']->id) }}">@csrf <button class="btn btn-sm btn-outline-primary py-0">Email reset code</button></form>
+                    @endif
+                    <form class="d-inline" method="post" action="{{ route('audit.admin.users.reset', $p['user']->id) }}" onsubmit="return confirm('Reset password to the default password?')">@csrf <button class="btn btn-sm btn-outline-secondary py-0">Reset to default</button></form>
                 </td>
             </tr>
-        @endforeach
+        @empty
+            <tr><td colspan="4" class="text-muted text-center py-3">No users.</td></tr>
+        @endforelse
         </tbody>
     </table>
 </div>
+<p class="small text-muted mt-2">One person can hold several roles (e.g. Faculty + HOD + Auditor). After login they choose the role to work in from the switcher at the top right. To add a role to an existing person, use their email in the form above.</p>
 @endsection

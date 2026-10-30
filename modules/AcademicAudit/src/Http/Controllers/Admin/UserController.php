@@ -10,21 +10,35 @@ use Mmmut\AcademicAudit\Models\UserRole;
 
 class UserController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, \Mmmut\AcademicAudit\Services\PasswordOtpService $otp)
     {
         $this->iqac();
         $roles = UserRole::with('user', 'department')
             ->when($request->role, fn ($q, $r) => $q->where('role', $r))
             ->when($request->department, fn ($q, $d) => $q->where('department_id', $d))
             ->get()
-            ->filter(fn ($r) => $r->user)
-            ->sortBy([['role', 'asc'], ['department.name', 'asc'], ['user.name', 'asc']]);
+            ->filter(fn ($r) => $r->user);
+        // one line per person with all of their roles
+        $people = $roles->groupBy('user_id')->map(fn ($rs) => ['user' => $rs->first()->user, 'roles' => $rs->sortBy('role')->values()])
+            ->sortBy(fn ($p) => mb_strtolower($p['user']->name))->values();
 
         return $this->view('admin.users', [
-            'roles' => $roles,
+            'people' => $people,
             'departments' => Department::orderBy('name')->get(),
             'labels' => UserRole::LABELS,
+            'otpEnabled' => $otp->enabled(),
         ]);
+    }
+
+    public function sendOtp(int $user, \Mmmut\AcademicAudit\Services\PasswordOtpService $otp)
+    {
+        $this->iqac();
+        $model = config('academic-audit.user_model');
+        $u = $model::findOrFail($user);
+        abort_unless($otp->enabled(), 422, 'Password reset by email is not enabled.');
+        return back()->with('status', $otp->issue($u->email, request()->ip())
+            ? "Reset code sent to {$u->email}."
+            : "Could not send the code to {$u->email} (check email settings).");
     }
 
     public function store(Request $request)
@@ -46,7 +60,8 @@ class UserController extends Controller
                 'email' => $data['email'],
                 'password' => Hash::make(config('academic-audit.default_password')),
             ]);
-            if (\Illuminate\Support\Facades\Schema::hasColumn($user->getTable(), 'must_change_password')) {
+            if (\Illuminate\Support\Facades\Schema::hasColumn($user->getTable(), 'must_change_password')
+                && app(\Mmmut\AcademicAudit\Services\SettingsService::class)->get('security.force_change')) {
                 $user->forceFill(['must_change_password' => true]);
             }
             $user->save();

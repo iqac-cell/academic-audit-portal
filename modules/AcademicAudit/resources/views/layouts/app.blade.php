@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Academic Audit') · MMMUT IQAC</title>
+    <title>@yield('title', 'Academic Audit') · {{ $settings->get('general.portal_title') }}</title>
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap/bootstrap.min.css') }}">
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
     <style>
@@ -25,7 +25,7 @@
 <nav class="navbar navbar-expand-lg navbar-dark" style="background:#1f3a5f">
     <div class="container-fluid">
         <a class="navbar-brand" href="{{ route('audit.dashboard') }}">
-            <i class="bi bi-clipboard-check"></i> Internal Academic Audit
+            <i class="bi bi-clipboard-check"></i> {{ $settings->get('general.portal_title') }}
             <small>MMMUT Gorakhpur · IQAC</small>
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav"><span class="navbar-toggler-icon"></span></button>
@@ -43,17 +43,15 @@
                             <li><a class="dropdown-item" href="{{ route('audit.admin.users') }}">Users &amp; roles</a></li>
                             <li><a class="dropdown-item" href="{{ route('audit.admin.departments') }}">Departments</a></li>
                             <li><a class="dropdown-item" href="{{ route('audit.admin.faculty') }}">Faculty / ERP import</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ route('audit.admin.settings') }}"><i class="bi bi-gear"></i> Portal settings</a></li>
                         </ul>
                     </li>
                 @endif
             </ul>
             @auth
-                <span class="navbar-text text-white-50 me-3 small">
-                    {{ auth()->user()->name }}
-                    @foreach($access->roles()->pluck('role')->unique() as $r)
-                        <span class="badge bg-light text-dark">{{ \Mmmut\AcademicAudit\Models\UserRole::LABELS[$r] ?? $r }}</span>
-                    @endforeach
-                </span>
+                <span class="navbar-text text-white-50 me-2 small">{{ auth()->user()->name }}</span>
+                @include('audit::partials.role-switcher')
                 @if(Route::has('password.change'))
                     <a class="btn btn-sm btn-outline-light me-2" href="{{ route('password.change') }}"><i class="bi bi-key"></i></a>
                 @endif

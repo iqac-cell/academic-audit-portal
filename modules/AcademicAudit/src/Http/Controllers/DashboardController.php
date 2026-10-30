@@ -22,10 +22,14 @@ class DashboardController extends Controller
 
         $query = Audit::with('department', 'cycle', 'auditor1', 'auditor2')->where('cycle_id', $cycle->id);
         if (! $access->isIqac()) {
-            $deptIds = array_filter(array_merge($access->hodDepartmentIds(), [$access->faculty()?->department_id]));
-            $query->where(fn ($q) => $q->whereIn('department_id', $deptIds ?: [0])
-                ->orWhere('auditor1_user_id', $access->userId())
-                ->orWhere('auditor2_user_id', $access->userId()));
+            // only what the active role works on
+            $query->where(function ($q) use ($access) {
+                if ($access->isAuditor()) {
+                    $q->where('auditor1_user_id', $access->userId())->orWhere('auditor2_user_id', $access->userId());
+                } else {
+                    $q->where('department_id', $access->activeDepartmentId() ?? 0);
+                }
+            });
         }
         $audits = $query->get()->sortBy('department.name');
 
@@ -40,7 +44,7 @@ class DashboardController extends Controller
             ];
         });
 
-        $myPending = $access->faculty()
+        $myPending = $access->isFaculty() && $access->faculty()
             ? Entry::where('faculty_id', $access->faculty()->id)->whereIn('audit_id', $audits->pluck('id'))->get()->groupBy('status')->map->count()
             : collect();
 

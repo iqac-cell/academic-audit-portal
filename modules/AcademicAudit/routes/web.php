@@ -8,6 +8,7 @@ Route::middleware(config('academic-audit.middleware'))
     ->name('audit.')
     ->group(function () {
         Route::get('/', [C\DashboardController::class, 'index'])->name('dashboard');
+        Route::post('role', [C\RoleController::class, 'switch'])->name('role.switch');
 
         Route::prefix('audits/{audit}')->scopeBindings()->group(function () {
             Route::get('/', [C\AuditController::class, 'show'])->name('show');
@@ -24,6 +25,7 @@ Route::middleware(config('academic-audit.middleware'))
             Route::post('items/{code}/prefill', [C\EntryController::class, 'prefill'])->name('items.prefill');
             Route::get('items/{code}/template', [C\EntryController::class, 'template'])->name('items.template');
             Route::post('items/{code}/import', [C\EntryController::class, 'import'])->name('items.import');
+            Route::post('items/{code}/extract', [C\AiController::class, 'extract'])->middleware('throttle:20,1')->name('items.extract');
             Route::put('entries/{entry}', [C\EntryController::class, 'update'])->name('entries.update');
             Route::delete('entries/{entry}', [C\EntryController::class, 'destroy'])->name('entries.destroy');
             Route::post('entries/{entry}/review', [C\EntryController::class, 'review'])->name('entries.review');
@@ -64,6 +66,12 @@ Route::middleware(config('academic-audit.middleware'))
             Route::post('users', [C\Admin\UserController::class, 'store'])->name('users.store');
             Route::delete('roles/{role}', [C\Admin\UserController::class, 'destroy'])->name('roles.destroy');
             Route::post('users/{user}/reset-password', [C\Admin\UserController::class, 'resetPassword'])->name('users.reset');
+            Route::post('users/{user}/send-otp', [C\Admin\UserController::class, 'sendOtp'])->name('users.otp');
+
+            Route::get('settings', [C\Admin\SettingsController::class, 'index'])->name('settings');
+            Route::post('settings/test-mail', [C\Admin\SettingsController::class, 'testMail'])->name('settings.test-mail');
+            Route::post('settings/test-ai', [C\Admin\SettingsController::class, 'testAi'])->name('settings.test-ai');
+            Route::post('settings/{group}', [C\Admin\SettingsController::class, 'update'])->name('settings.update');
 
             Route::get('departments', [C\Admin\DepartmentController::class, 'index'])->name('departments');
             Route::post('departments', [C\Admin\DepartmentController::class, 'store'])->name('departments.store');

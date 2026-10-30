@@ -6,12 +6,17 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
+use Mmmut\AcademicAudit\Services\SettingsService;
 
 class AuthController extends Controller
 {
-    public function showLogin()
+    public function showLogin(SettingsService $settings)
     {
-        return view('auth.login');
+        return view('auth.login', [
+            'otpEnabled' => $settings->enabled('security.otp_reset'),
+            'notice' => $settings->get('general.login_notice'),
+            'contact' => $settings->get('general.contact_email'),
+        ]);
     }
 
     public function login(Request $request)
@@ -26,6 +31,7 @@ class AuthController extends Controller
             return back()->withErrors(['email' => 'Invalid email or password.'])->onlyInput('email');
         }
         $request->session()->regenerate();
+        $request->session()->forget(\Mmmut\AcademicAudit\Support\Access::SESSION_KEY);
         return redirect()->intended(route('audit.dashboard'));
     }
 
@@ -42,11 +48,11 @@ class AuthController extends Controller
         return view('auth.change-password');
     }
 
-    public function changePassword(Request $request)
+    public function changePassword(Request $request, SettingsService $settings)
     {
         $request->validate([
             'current_password' => 'required|current_password',
-            'password' => ['required', 'confirmed', 'different:current_password', Password::min(8)->letters()->numbers()],
+            'password' => ['required', 'confirmed', 'different:current_password', Password::min(max(6, (int) $settings->get('security.password_min')))->letters()->numbers()],
         ]);
         $request->user()->forceFill([
             'password' => Hash::make($request->password),
