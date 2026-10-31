@@ -44,6 +44,7 @@
                             <li><a class="dropdown-item" href="{{ route('audit.admin.departments') }}">Departments</a></li>
                             <li><a class="dropdown-item" href="{{ route('audit.admin.faculty') }}">Faculty / ERP import</a></li>
                             <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ route('audit.admin.notices') }}"><i class="bi bi-megaphone"></i> Notices</a></li>
                             <li><a class="dropdown-item" href="{{ route('audit.admin.settings') }}"><i class="bi bi-gear"></i> Portal settings</a></li>
                         </ul>
                     </li>
@@ -66,7 +67,36 @@
     @include('audit::partials.flash')
     @yield('content')
 </main>
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="sessionToast" class="toast" role="alert" aria-live="assertive" data-bs-autohide="false">
+        <div class="toast-body">
+            Your session will expire in a minute because of inactivity.
+            <div class="mt-2"><button type="button" id="stayIn" class="btn btn-sm btn-primary">Stay logged in</button></div>
+        </div>
+    </div>
+</div>
 <script src="{{ asset('vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+<script>
+// Send the user to the login page when the session times out, instead of letting a later click fail with "419 Page Expired".
+(function () {
+    const lifetime = {{ (int) config('session.lifetime') }} * 60 * 1000;
+    const loginUrl = @json(route('login', ['expired' => 1]));
+    const pingUrl = @json(route('audit.ping'));
+    let warnTimer, expireTimer;
+    function arm() {
+        clearTimeout(warnTimer); clearTimeout(expireTimer);
+        warnTimer = setTimeout(() => bootstrap.Toast.getOrCreateInstance(document.getElementById('sessionToast')).show(), Math.max(0, lifetime - 60000));
+        expireTimer = setTimeout(() => { window.location.href = loginUrl; }, lifetime);
+    }
+    document.getElementById('stayIn').addEventListener('click', async () => {
+        const res = await fetch(pingUrl, {headers: {'Accept': 'application/json'}, credentials: 'same-origin'});
+        if (res.status === 401 || res.redirected) { window.location.href = loginUrl; return; }
+        bootstrap.Toast.getOrCreateInstance(document.getElementById('sessionToast')).hide();
+        arm();
+    });
+    arm();
+})();
+</script>
 @stack('scripts')
 </body>
 </html>

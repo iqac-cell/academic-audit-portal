@@ -3,6 +3,7 @@
 @section('content')
 <h5 class="mb-3">Sign in</h5>
 @if(session('status'))<div class="alert alert-success py-2 small">{{ session('status') }}</div>@endif
+@if(session('expired') || request()->boolean('expired'))<div class="alert alert-warning py-2 small"><i class="bi bi-clock-history"></i> {{ session('expired', 'Your session expired. Please log in again.') }}</div>@endif
 @if(!empty($notice))<div class="alert alert-info py-2 small" style="white-space: pre-line">{{ $notice }}</div>@endif
 <form method="post" action="{{ url('login') }}">
     @csrf

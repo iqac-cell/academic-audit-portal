@@ -5,9 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title') · MMMUT Academic Audit</title>
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
 </head>
 <body style="background:#1f3a5f">
 <div class="container py-5">
+    @if(isset($notices) && $notices->isNotEmpty())
+        <div class="row justify-content-center"><div class="col-lg-9">@include('audit::partials.notice-ticker')</div></div>
+    @endif
     <div class="row justify-content-center">
         <div class="col-md-5">
             <div class="text-center text-white mb-3">

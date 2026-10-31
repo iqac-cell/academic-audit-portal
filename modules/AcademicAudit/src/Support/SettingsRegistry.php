@@ -52,6 +52,7 @@ class SettingsRegistry
             'security.otp_attempts' => ['security', 'Wrong OTP attempts allowed', 'number', 5],
             'security.password_min' => ['security', 'Minimum password length', 'number', 8],
             'security.force_change' => ['security', 'New accounts must change password at first login', 'bool', true],
+            'security.session_minutes' => ['security', 'Log out after inactivity (minutes)', 'number', 120, null, 'After this time without any activity the user is sent back to the login page.'],
 
             // Notifications
             'notify.enabled' => ['notify', 'Send email notifications (needs email enabled)', 'bool', false],

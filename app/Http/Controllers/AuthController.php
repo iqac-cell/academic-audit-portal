@@ -16,6 +16,7 @@ class AuthController extends Controller
             'otpEnabled' => $settings->enabled('security.otp_reset'),
             'notice' => $settings->get('general.login_notice'),
             'contact' => $settings->get('general.contact_email'),
+            'notices' => \Mmmut\AcademicAudit\Models\Notice::visible('login')->get(),
         ]);
     }
 

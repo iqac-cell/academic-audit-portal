@@ -77,6 +77,27 @@ record linked to the login counts as the Faculty role. IQAC adds roles to a pers
 **Every new feature is off by default.** Secrets (SMTP password, API key) are stored encrypted with `APP_KEY`. If `APP_KEY`
 changes, enter the secrets again.
 
+### Session expiry
+
+After **Log out after inactivity** minutes (Settings → Login & password, default 120), the browser is sent back to the login
+page with "Your session expired". A minute earlier the user gets a "Stay logged in" prompt. A form submitted after expiry
+also lands on the login page instead of Laravel's "419 Page Expired".
+
+### Notices (scrolling ticker)
+
+Administration → Notices: IQAC adds notices with an optional link or attachment (PDF/image/Office), the place to show them
+(login page, dashboard, or both), from/till dates, display order and a blinking "NEW" badge. Active notices scroll on the login
+page and the dashboard. The ticker pauses on mouse-over. Attachments of active notices can be opened without logging in.
+
+### Creating users from Excel
+
+Administration → Users & roles → **Import users from Excel**. Download the template (Name, Email, Roles, Department, Designation,
+Mobile; the "Help" sheet lists departments), upload it, check the preview (new / existing / error per row) and confirm.
+- Existing users only get the extra roles.
+- Faculty/HOD rows also create the faculty record.
+- New users get the default password and must change it at first login.
+- Login details can be emailed when email is on.
+
 ### Daily task (reminders, auto-close)
 
 Schedule once a day with Windows Task Scheduler:

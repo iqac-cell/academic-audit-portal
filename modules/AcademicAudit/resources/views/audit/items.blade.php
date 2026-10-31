@@ -157,6 +157,7 @@
                             headers: {'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json'},
                         });
                         const json = await res.json();
+                        if (res.status === 419 && json.redirect) { window.location.href = json.redirect; return; }
                         if (!res.ok) { msg.className = 'small mt-1 text-danger'; msg.textContent = json.message || 'Could not read the document.'; return; }
                         for (const [key, value] of Object.entries(json.data || {})) {
                             const el = document.getElementById('f_' + key);

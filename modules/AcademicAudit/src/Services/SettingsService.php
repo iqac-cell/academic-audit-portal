@@ -107,6 +107,7 @@ class SettingsService
     public function applyToConfig(): void
     {
         config([
+            'session.lifetime' => max(5, (int) $this->get('security.session_minutes')),
             'academic-audit.max_upload_kb' => (int) $this->get('workflow.max_upload_mb') * 1024,
             'academic-audit.upload_mimes' => preg_replace('/[^a-z0-9,]/', '', strtolower((string) $this->get('workflow.upload_types'))),
         ]);

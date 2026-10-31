@@ -1,6 +1,7 @@
 @extends(config('academic-audit.layout'))
 @section('title', 'Dashboard')
 @section('content')
+@include('audit::partials.notice-ticker', ['notices' => \Mmmut\AcademicAudit\Models\Notice::visible('dashboard')->get()])
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
     <h4 class="mb-0">Academic Audit {{ $cycle?->academic_year }}</h4>
     @if($cycles->count() > 1)

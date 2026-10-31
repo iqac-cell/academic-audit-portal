@@ -1,7 +1,10 @@
 @extends(config('academic-audit.layout'))
 @section('title', 'Users & roles')
 @section('content')
-<h4>Users &amp; roles</h4>
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h4 class="mb-0">Users &amp; roles</h4>
+    <a href="{{ route('audit.admin.users.import') }}" class="btn btn-sm btn-success"><i class="bi bi-file-earmark-excel"></i> Import users from Excel</a>
+</div>
 <div class="card shadow-sm mb-3">
     <div class="card-header bg-white"><strong>Assign a role</strong> <span class="small text-muted">— a new login is created with the default password if the email is not registered</span></div>
     <div class="card-body">

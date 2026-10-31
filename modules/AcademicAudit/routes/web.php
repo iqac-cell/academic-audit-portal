@@ -3,12 +3,21 @@
 use Illuminate\Support\Facades\Route;
 use Mmmut\AcademicAudit\Http\Controllers as C;
 
+// Public: notice attachments are linked from the login page as well.
+Route::middleware('web')
+    ->prefix(config('academic-audit.route_prefix'))
+    ->name('audit.')
+    ->group(function () {
+        Route::get('notices/{notice}/file', [C\NoticeFileController::class, 'show'])->name('notices.file');
+    });
+
 Route::middleware(config('academic-audit.middleware'))
     ->prefix(config('academic-audit.route_prefix'))
     ->name('audit.')
     ->group(function () {
         Route::get('/', [C\DashboardController::class, 'index'])->name('dashboard');
         Route::post('role', [C\RoleController::class, 'switch'])->name('role.switch');
+        Route::get('ping', fn () => response()->noContent())->name('ping'); // keeps the session alive
 
         Route::prefix('audits/{audit}')->scopeBindings()->group(function () {
             Route::get('/', [C\AuditController::class, 'show'])->name('show');
@@ -64,9 +73,20 @@ Route::middleware(config('academic-audit.middleware'))
 
             Route::get('users', [C\Admin\UserController::class, 'index'])->name('users');
             Route::post('users', [C\Admin\UserController::class, 'store'])->name('users.store');
+            Route::get('users/import', [C\Admin\UserController::class, 'importForm'])->name('users.import');
+            Route::get('users/import/template', [C\Admin\UserController::class, 'importTemplate'])->name('users.import.template');
+            Route::post('users/import', [C\Admin\UserController::class, 'importPreview'])->name('users.import.preview');
+            Route::post('users/import/confirm', [C\Admin\UserController::class, 'importConfirm'])->name('users.import.confirm');
+            Route::post('users/import/cancel', [C\Admin\UserController::class, 'importCancel'])->name('users.import.cancel');
             Route::delete('roles/{role}', [C\Admin\UserController::class, 'destroy'])->name('roles.destroy');
             Route::post('users/{user}/reset-password', [C\Admin\UserController::class, 'resetPassword'])->name('users.reset');
             Route::post('users/{user}/send-otp', [C\Admin\UserController::class, 'sendOtp'])->name('users.otp');
+
+            Route::get('notices', [C\Admin\NoticeController::class, 'index'])->name('notices');
+            Route::post('notices', [C\Admin\NoticeController::class, 'store'])->name('notices.store');
+            Route::put('notices/{notice}', [C\Admin\NoticeController::class, 'update'])->name('notices.update');
+            Route::post('notices/{notice}/toggle', [C\Admin\NoticeController::class, 'toggle'])->name('notices.toggle');
+            Route::delete('notices/{notice}', [C\Admin\NoticeController::class, 'destroy'])->name('notices.destroy');
 
             Route::get('settings', [C\Admin\SettingsController::class, 'index'])->name('settings');
             Route::post('settings/test-mail', [C\Admin\SettingsController::class, 'testMail'])->name('settings.test-mail');
