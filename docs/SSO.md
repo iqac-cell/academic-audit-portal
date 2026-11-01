@@ -117,6 +117,10 @@ QSPHERE_DB_TRUST_SERVER_CERTIFICATE=true
 Then `php artisan migrate --force` and `php artisan config:cache route:cache` (or run
 `deploy\server\update-from-git.ps1`).
 
+PHP must trust the server's HTTPS certificate for the calls to Q-Sphere; otherwise the callback fails with
+"cURL error 60". In `C:\php\php.ini` set `curl.cainfo` and `openssl.cafile` to `C:\php\extras\ssl\cacert.pem`, then
+restart the application pool.
+
 SQL Server: `academic_audit`, `qsphere` and `sdg_portal` all live on the server's default instance MSSQLSERVER at
 `tcp:localhost,14330` (so `DB_HOST=localhost`, `DB_PORT=14330` for the portal's own database too). Instance
 MSSQLSERVER01 (port 1433) is not used by any of them; do not point anything at it.
