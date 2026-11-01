@@ -53,6 +53,9 @@
             @auth
                 <span class="navbar-text text-white-50 me-2 small">{{ auth()->user()->name }}</span>
                 @include('audit::partials.role-switcher')
+                @if(config('sso.enabled') && config('sso.portal_switcher_js'))
+                    <div data-portal-switcher data-current="academic-audit" class="me-2"></div>
+                @endif
                 @if(Route::has('password.change'))
                     <a class="btn btn-sm btn-outline-light me-2" href="{{ route('password.change') }}"><i class="bi bi-key"></i></a>
                 @endif
@@ -97,6 +100,11 @@
     arm();
 })();
 </script>
+@auth
+    @if(config('sso.enabled') && config('sso.portal_switcher_js'))
+        <script src="{{ config('sso.portal_switcher_js') }}" defer></script>
+    @endif
+@endauth
 @stack('scripts')
 </body>
 </html>

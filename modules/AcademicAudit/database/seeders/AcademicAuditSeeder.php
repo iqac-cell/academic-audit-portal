@@ -18,6 +18,9 @@ class AcademicAuditSeeder extends Seeder
             foreach ($aliases as $alias) {
                 $dept->aliases()->firstOrCreate(['alias' => $alias]);
             }
+            foreach (array_keys(DepartmentList::QSPHERE_CODES, $short, true) as $code) {
+                \Mmmut\AcademicAudit\Models\DepartmentAlias::firstOrCreate(['alias' => $code], ['department_id' => $dept->id]);
+            }
         }
 
         if (! Cycle::exists()) {

@@ -79,6 +79,17 @@ class SsoLoginTest extends TestCase
         $this->assertSame('auditor:', session(Access::SESSION_KEY));
     }
 
+    public function test_portal_switcher_is_in_the_header(): void
+    {
+        $this->loginWith();
+        $this->get(route('audit.dashboard'))->assertOk()
+            ->assertSee('<div data-portal-switcher data-current="academic-audit"', false)
+            ->assertSee('<script src="/iqac/assets/js/portal-switcher.js" defer></script>', false);
+
+        config(['sso.enabled' => false]);
+        $this->get(route('audit.dashboard'))->assertOk()->assertDontSee('data-portal-switcher', false);
+    }
+
     public function test_sso_user_is_not_forced_to_change_local_password(): void
     {
         $this->hod->forceFill(['must_change_password' => true])->save();

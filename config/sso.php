@@ -27,4 +27,8 @@ return [
     'leeway' => (int) env('SSO_LEEWAY', 60),
     'cache_seconds' => (int) env('SSO_CACHE_SECONDS', 3600),
     'http_timeout' => (int) env('SSO_HTTP_TIMEOUT', 10),
+
+    // Q-Sphere's portal switcher (same origin, absolute path), shown in the header of every logged-in page.
+    // It fetches /iqac/oauth/portals with the Q-Sphere session. Empty = no switcher.
+    'portal_switcher_js' => env('SSO_PORTAL_SWITCHER_JS', '/iqac/assets/js/portal-switcher.js'),
 ];

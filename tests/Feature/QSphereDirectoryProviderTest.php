@@ -118,6 +118,42 @@ class QSphereDirectoryProviderTest extends TestCase
         $this->assertEquals($local->faculty($this->cse)->pluck('name'), $this->provider()->faculty($this->cse)->pluck('name'));
     }
 
+    public function test_live_qsphere_codes_map_and_check_command_lists_unmapped(): void
+    {
+        $live = ['CED' => 'Civil', 'CESD' => 'Chemistry & Env', 'CHED' => 'Chemical', 'CSED' => 'CSE', 'ECED' => 'ECE',
+            'EED' => 'Electrical', 'HSSD' => 'Humanities', 'IKSD' => 'Indian Knowledge Systems', 'ITCAD' => 'IT & Computer Application',
+            'MED' => 'Mechanical', 'MSCD' => 'Mathematics & Sci Computing', 'MSD' => 'Management Studies',
+            'PHSTD' => 'Pharmaceutical Science & Technology', 'PMSD' => 'Physics & Material Science'];
+        DB::connection('qsphere')->table('sdg_departments')->delete();
+        DB::connection('qsphere')->table('sdg_departments')->insert(collect($live)
+            ->map(fn ($name, $code) => ['code' => $code, 'name' => $name, 'type' => 'department', 'is_active' => 1])->values()->all());
+        DB::connection('qsphere')->table('sdg_users')->update(['dept_code' => 'CSED']);
+
+        $codes = $this->provider()->departmentCodes();
+        $short = collect($codes)->map(fn ($id) => Department::find($id)->short_name)->all();
+        $this->assertEquals(\Mmmut\AcademicAudit\Support\DepartmentList::QSPHERE_CODES, array_intersect_key($short, \Mmmut\AcademicAudit\Support\DepartmentList::QSPHERE_CODES));
+        $this->assertCount(12, $codes);
+        $this->assertSame(['IKSD', 'PHSTD'], array_keys($this->provider()->unmappedDepartments()));
+        $this->assertSame(12, $this->provider()->departments()->count());
+
+        $aliases = DepartmentAlias::count();
+        $this->artisan('audit:directory-check')
+            ->expectsOutputToContain('Unmapped Q-Sphere departments')
+            ->expectsOutputToContain('PHSTD')
+            ->expectsOutputToContain('IKSD')
+            ->expectsOutputToContain('Nothing was changed')
+            ->assertSuccessful();
+        $this->assertSame($aliases, DepartmentAlias::count());
+        $this->assertSame(12, Department::count());
+    }
+
+    public function test_check_command_fails_when_qsphere_is_unreachable(): void
+    {
+        config(['database.connections.qsphere' => ['driver' => 'sqlite', 'database' => base_path('does/not/exist.sqlite'), 'prefix' => '']]);
+        DB::purge('qsphere');
+        $this->artisan('audit:directory-check')->expectsOutputToContain('cannot be read')->assertFailed();
+    }
+
     public function test_provider_is_selected_from_config(): void
     {
         $this->assertInstanceOf(LocalDirectoryProvider::class, app(DirectoryProvider::class));

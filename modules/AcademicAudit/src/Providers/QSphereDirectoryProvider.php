@@ -25,6 +25,7 @@ use Mmmut\AcademicAudit\Support\DepartmentList;
 class QSphereDirectoryProvider implements DirectoryProvider
 {
     private ?array $departmentCodes = null;
+    private array $unmapped = [];
     private array $faculty = [];
 
     public function __construct(private LocalDirectoryProvider $local) {}
@@ -122,15 +123,29 @@ class QSphereDirectoryProvider implements DirectoryProvider
 
         [$byCode, $byName] = $this->localIndex();
         $map = [];
+        $this->unmapped = [];
         foreach ($rows as $r) {
             $code = trim((string) $r->code);
             $id = $byCode[mb_strtoupper($code)] ?? $byName[DepartmentList::key((string) $r->name)] ?? null;
             if ($id) {
                 $map[$code] = $id;
+            } else {
+                $this->unmapped[$code] = ['name' => (string) $r->name, 'type' => $r->type];
             }
         }
 
         return $this->departmentCodes = $map;
+    }
+
+    /**
+     * Active Q-Sphere departments that match no audit department (call departmentCodes() first).
+     *
+     * @return array<string, array{name: string, type: ?string}>
+     */
+    public function unmappedDepartments(): array
+    {
+        $this->departmentCodes();
+        return $this->unmapped;
     }
 
     /** [upper-case short name / alias → id, loose name key → id] for local departments. */

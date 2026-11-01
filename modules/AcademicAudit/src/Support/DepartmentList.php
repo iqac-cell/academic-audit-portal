@@ -20,6 +20,12 @@ class DepartmentList
         'Management Studies' => ['MBA', []],
     ];
 
+    /** Department codes used by Q-Sphere (view sdg_departments) → audit short name. */
+    public const QSPHERE_CODES = [
+        'CED' => 'CE', 'EED' => 'EE', 'ECED' => 'ECE', 'MED' => 'ME', 'CSED' => 'CSE', 'ITCAD' => 'ITCA',
+        'CHED' => 'CHE', 'PMSD' => 'PMS', 'MSCD' => 'MSC', 'HSSD' => 'HSS', 'CESD' => 'CES', 'MSD' => 'MBA',
+    ];
+
     /** Loose key for matching names that differ only in punctuation / "Deptt." / "Engg.". */
     public static function key(string $name): string
     {

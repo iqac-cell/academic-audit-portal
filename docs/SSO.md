@@ -66,8 +66,9 @@ exactly as before.
 
 * `sdg_departments(code, name, type, is_active)` – active rows only. Each code is matched to `aa_departments.short_name`
   (case-insensitive), else to an `aa_department_aliases.alias`, else by name (same loose matching as the ERP import).
-  Codes that match nothing (offices, new departments) are ignored; add an alias in Administration → Departments to map
-  a new code.
+  Codes that match nothing (offices, new departments) are ignored; nothing is created for them. To map a new code, add
+  it to `DepartmentList::QSPHERE_CODES` and ship a migration like `2026_11_02_000001_add_qsphere_department_codes`
+  (or insert a row in `aa_department_aliases`).
 * `sdg_users(email, name, employee_id, dept_code, office_code, is_active[, designation])` – active rows of the matched
   codes. When a designation is given, only designations matching `ACADEMIC_AUDIT_FACULTY_DESIGNATIONS`
   (default `/professor|lecturer|teaching|faculty/i`) count as faculty.
@@ -76,6 +77,41 @@ exactly as before.
   row count as regular).
 * If Q-Sphere cannot be read, the local directory (ERP Excel import) is used and a warning is logged.
   `ACADEMIC_AUDIT_DIRECTORY=local` (default) keeps the old behaviour entirely.
+
+### Q-Sphere department codes
+
+Seeded as aliases by migration `2026_11_02_000001_add_qsphere_department_codes` (and by the seeder on new installs):
+
+| Q-Sphere | CED | EED | ECED | MED | CSED | ITCAD | CHED | PMSD | MSCD | HSSD | CESD | MSD |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Audit | CE | EE | ECE | ME | CSE | ITCA | CHE | PMS | MSC | HSS | CES | MBA |
+
+PHSTD (Pharmaceutical Science & Technology) and IKSD (Indian Knowledge Systems) have no audit department and stay
+unmapped on purpose: they get no audit and their staff are not listed.
+
+### Switching the directory to Q-Sphere
+
+In `C:\sites\academic-audit-portal` on the server (Administrator PowerShell):
+
+1. Update the code: `deploy\server\update-from-git.ps1 -Ref main` (runs the migration that adds the code aliases).
+2. Make sure `.env` has the `QSPHERE_DB_*` settings and `audit_reader` can read the views
+   (`deploy/server/grant-audit-reader-qsphere.sql`).
+3. Dry run, changes nothing: `php artisan audit:directory-check`. Per audit department it shows the Q-Sphere code (or
+   NOT IN Q-SPHERE), how many faculty would come from Q-Sphere, how many of them already have a local record, the
+   regular-faculty count for the latest cycle and today's local count; then the unmapped Q-Sphere departments
+   (expected: IKSD, PHSTD). It stops with an error if Q-Sphere cannot be read.
+4. If the numbers look right: set `ACADEMIC_AUDIT_DIRECTORY=qsphere` in `.env`, then `php artisan config:cache` and
+   `Restart-WebAppPool -Name AcademicAudit`.
+5. Rollback: `ACADEMIC_AUDIT_DIRECTORY=local`, `php artisan config:cache`, restart the pool. Neither switch changes any
+   data (faculty from Q-Sphere are read live, not copied into `aa_faculty`).
+
+## Portal switcher
+
+With SSO on, every logged-in page has `<div data-portal-switcher data-current="academic-audit">` next to the role
+switcher and loads Q-Sphere's `/iqac/assets/js/portal-switcher.js` once (same origin; it calls `/iqac/oauth/portals`
+with the Q-Sphere session). `SSO_PORTAL_SWITCHER_JS` changes the script path; empty removes the switcher. The portal
+sends no Content-Security-Policy header (none in the app or `public/web.config`), so nothing blocks the script; if a
+CSP is added later it must allow `script-src 'self'` and `connect-src 'self'`.
 
 ## View for the Q-Sphere Portal Home
 

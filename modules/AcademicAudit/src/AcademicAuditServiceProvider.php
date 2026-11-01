@@ -44,6 +44,7 @@ class AcademicAuditServiceProvider extends ServiceProvider
                 Console\NewCycleCommand::class,
                 Console\GrantRoleCommand::class,
                 Console\RemindCommand::class,
+                Console\DirectoryCheckCommand::class,
             ]);
         }
     }
