@@ -2,17 +2,31 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Sso\OidcClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
+use Mmmut\AcademicAudit\Models\UserRole;
 use Mmmut\AcademicAudit\Services\SettingsService;
+use Mmmut\AcademicAudit\Support\Access;
 
 class AuthController extends Controller
 {
-    public function showLogin(SettingsService $settings)
+    /** With central login on, /login goes straight to Q-Sphere; /login/local stays for IQAC emergencies. */
+    public function showLogin(SettingsService $settings, OidcClient $oidc)
+    {
+        if ($oidc->enabled()) {
+            return redirect()->route('sso.redirect');
+        }
+        return $this->showLocalLogin($settings, $oidc);
+    }
+
+    public function showLocalLogin(SettingsService $settings, OidcClient $oidc)
     {
         return view('auth.login', [
+            'sso' => $oidc->enabled(),
             'otpEnabled' => $settings->enabled('security.otp_reset'),
             'notice' => $settings->get('general.login_notice'),
             'contact' => $settings->get('general.contact_email'),
@@ -20,7 +34,7 @@ class AuthController extends Controller
         ]);
     }
 
-    public function login(Request $request)
+    public function login(Request $request, OidcClient $oidc)
     {
         $credentials = $request->validate([
             'email' => 'required|email',
@@ -31,17 +45,29 @@ class AuthController extends Controller
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
             return back()->withErrors(['email' => 'Invalid email or password.'])->onlyInput('email');
         }
+        if ($oidc->enabled() && ! UserRole::where('user_id', Auth::id())->where('role', UserRole::IQAC)->exists()) {
+            Auth::logout();
+            return back()->withErrors(['email' => 'This login is only for IQAC administrators. Please use the central MMMUT login.'])->onlyInput('email');
+        }
         $request->session()->regenerate();
-        $request->session()->forget(\Mmmut\AcademicAudit\Support\Access::SESSION_KEY);
+        $request->session()->forget(Access::SESSION_KEY);
+        $request->session()->put(SsoController::SESSION_VIA, 'local');
         return redirect()->intended(route('audit.dashboard'));
     }
 
-    public function logout(Request $request)
+    public function logout(Request $request, OidcClient $oidc)
     {
+        $viaSso = $request->session()->get(SsoController::SESSION_VIA) === 'sso';
+        if ($id = Auth::id()) {
+            DB::table('sso_sessions')->where('user_id', $id)->delete();
+        }
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
-        return redirect()->route('login');
+        if ($oidc->enabled() && $viaSso) {
+            return redirect()->away($oidc->logoutUrl());
+        }
+        return redirect()->route($oidc->enabled() ? 'login.local' : 'login');
     }
 
     public function showChangePassword()

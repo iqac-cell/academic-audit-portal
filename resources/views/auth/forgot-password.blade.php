@@ -15,5 +15,5 @@
         <button class="btn btn-primary w-100">Send code</button>
     </form>
 @endif
-<div class="text-center mt-3"><a href="{{ route('login') }}" class="small">Back to login</a></div>
+<div class="text-center mt-3"><a href="{{ route(config('sso.enabled') ? 'login.local' : 'login') }}" class="small">Back to login</a></div>
 @endsection

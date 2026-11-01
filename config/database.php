@@ -112,6 +112,21 @@ return [
             'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
+        // Read-only access to the Q-Sphere IQAC portal (views sdg_departments, sdg_users),
+        // used by QSphereDirectoryProvider. Login audit_reader has SELECT on those views only.
+        'qsphere' => [
+            'driver' => env('QSPHERE_DB_DRIVER', 'sqlsrv'),
+            'host' => env('QSPHERE_DB_HOST', 'localhost'),
+            'port' => env('QSPHERE_DB_PORT', '14330'),
+            'database' => env('QSPHERE_DB_DATABASE', 'qsphere'),
+            'username' => env('QSPHERE_DB_USERNAME', 'audit_reader'),
+            'password' => env('QSPHERE_DB_PASSWORD', ''),
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'trust_server_certificate' => env('QSPHERE_DB_TRUST_SERVER_CERTIFICATE', 'true'),
+        ],
+
     ],
 
     /*

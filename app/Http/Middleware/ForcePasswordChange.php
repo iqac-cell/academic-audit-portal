@@ -5,13 +5,14 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 
-/** Accounts created from the ERP import must set their own password on first login. */
+/** Accounts created from the ERP import must set their own password on first login (not when signed in centrally). */
 class ForcePasswordChange
 {
     public function handle(Request $request, Closure $next)
     {
         $user = $request->user();
-        if ($user && $user->must_change_password && ! $request->routeIs('password.*', 'logout')) {
+        if ($user && $user->must_change_password && $request->session()->get(\App\Http\Controllers\SsoController::SESSION_VIA) !== 'sso'
+            && ! $request->routeIs('password.*', 'logout')) {
             return redirect()->route('password.change');
         }
         return $next($request);

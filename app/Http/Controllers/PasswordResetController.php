@@ -45,6 +45,6 @@ class PasswordResetController extends Controller
             return back()->withErrors(['code' => $error])->onlyInput('email');
         }
         session()->forget('otp_email');
-        return redirect()->route('login')->with('status', 'Password changed. Please log in with your new password.');
+        return redirect()->route(config('sso.enabled') ? 'login.local' : 'login')->with('status', 'Password changed. Please log in with your new password.');
     }
 }

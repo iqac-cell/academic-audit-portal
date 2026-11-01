@@ -177,7 +177,15 @@ To serve the portal at `https://sdg.mmmut.ac.in/academic-audit` without copying 
 
 `public/web.config` clears the parent site's rewrite rules, so SDG's own rules do not capture `/academic-audit/*` requests.
 
+## Central login (Q-Sphere)
+
+With `SSO_ENABLED=true` everyone signs in through the Q-Sphere IQAC portal; `/login/local` stays as an emergency login
+for IQAC only. Departments and faculty can be read from Q-Sphere with `ACADEMIC_AUDIT_DIRECTORY=qsphere`.
+See [docs/SSO.md](docs/SSO.md) for the flow, the server settings and the SQL grants.
+
 ## Updating the server
+
+`deploy\server\update-from-git.ps1` runs these steps (Administrator PowerShell on the server):
 
 ```powershell
 git pull

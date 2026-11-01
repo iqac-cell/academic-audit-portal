@@ -12,5 +12,5 @@
     <div class="mb-3"><label class="form-label">Confirm new password</label><input type="password" name="password_confirmation" class="form-control" required></div>
     <button class="btn btn-primary w-100">Set new password</button>
 </form>
-<div class="text-center mt-3"><a href="{{ route('password.request') }}" class="small">Send a new code</a> · <a href="{{ route('login') }}" class="small">Back to login</a></div>
+<div class="text-center mt-3"><a href="{{ route('password.request') }}" class="small">Send a new code</a> · <a href="{{ route(config('sso.enabled') ? 'login.local' : 'login') }}" class="small">Back to login</a></div>
 @endsection

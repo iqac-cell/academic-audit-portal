@@ -13,6 +13,9 @@ return Application::configure(basePath: dirname(__DIR__))
         web: __DIR__.'/../routes/web.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        // Called server-to-server by Q-Sphere: no session, cookies or CSRF token.
+        then: fn () => Illuminate\Support\Facades\Route::post('sso/backchannel-logout', [App\Http\Controllers\SsoController::class, 'backchannelLogout'])
+            ->middleware('throttle:60,1')->name('sso.backchannel-logout'),
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->web(append: [\App\Http\Middleware\ForcePasswordChange::class]);

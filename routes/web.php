@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\SsoController;
 use Illuminate\Support\Facades\Route;
 
 // When the module has its own prefix, send the site root to it. With an empty prefix
@@ -19,7 +20,12 @@ if (config('academic-audit.route_prefix') !== '') {
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'showLogin'])->name('login');
+    Route::get('login/local', [AuthController::class, 'showLocalLogin'])->name('login.local');
+    Route::post('login/local', [AuthController::class, 'login'])->middleware('throttle:10,1');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+
+    Route::get('sso/login', [SsoController::class, 'redirect'])->name('sso.redirect');
+    Route::get('sso/callback', [SsoController::class, 'callback'])->name('sso.callback');
 
     Route::get('forgot-password', [PasswordResetController::class, 'request'])->name('password.request');
     Route::post('forgot-password', [PasswordResetController::class, 'send'])->middleware('throttle:5,10')->name('password.email');

@@ -1,11 +1,15 @@
 @extends('auth.guest')
 @section('title', 'Login')
 @section('content')
-<h5 class="mb-3">Sign in</h5>
+<h5 class="mb-3">{{ $sso ? 'Emergency login (IQAC only)' : 'Sign in' }}</h5>
+@if($sso)
+    <a href="{{ route('sso.redirect') }}" class="btn btn-success w-100 mb-3"><i class="bi bi-box-arrow-in-right"></i> Sign in with MMMUT central login</a>
+    <p class="small text-muted">HODs, faculty and auditors sign in through the central login. This form is only for IQAC administrators when the central login is unavailable.</p>
+@endif
 @if(session('status'))<div class="alert alert-success py-2 small">{{ session('status') }}</div>@endif
 @if(session('expired') || request()->boolean('expired'))<div class="alert alert-warning py-2 small"><i class="bi bi-clock-history"></i> {{ session('expired', 'Your session expired. Please log in again.') }}</div>@endif
 @if(!empty($notice))<div class="alert alert-info py-2 small" style="white-space: pre-line">{{ $notice }}</div>@endif
-<form method="post" action="{{ url('login') }}">
+<form method="post" action="{{ url('login/local') }}">
     @csrf
     <div class="mb-3">
         <label class="form-label" for="email">Official email</label>
@@ -22,6 +26,8 @@
 @if($otpEnabled)
     <div class="text-center mt-2"><a href="{{ route('password.request') }}" class="small">Forgot password?</a></div>
 @endif
+@unless($sso)
 <p class="small text-muted mt-3 mb-0">HODs and faculty sign in with their official @mmmut.ac.in email. First-time users must change the default password.
     @unless($otpEnabled) Forgot password? Contact the IQAC office{{ $contact ? ' ('.$contact.')' : '' }}.@endunless</p>
+@endunless
 @endsection

@@ -16,8 +16,18 @@ return [
     // Eloquent model of the host application's users (needs id, name, email).
     'user_model' => env('ACADEMIC_AUDIT_USER_MODEL', \App\Models\User::class),
 
-    // Where department / faculty master data comes from.
-    'directory_provider' => \Mmmut\AcademicAudit\Providers\LocalDirectoryProvider::class,
+    // Where department / faculty master data comes from: ACADEMIC_AUDIT_DIRECTORY=local (aa_ tables filled by the
+    // ERP Excel import) or qsphere (Q-Sphere views over the read-only "qsphere" connection, local data as fallback).
+    'directory_provider' => match (env('ACADEMIC_AUDIT_DIRECTORY', 'local')) {
+        'qsphere' => \Mmmut\AcademicAudit\Providers\QSphereDirectoryProvider::class,
+        default => \Mmmut\AcademicAudit\Providers\LocalDirectoryProvider::class,
+    },
+
+    'qsphere' => [
+        'connection' => env('ACADEMIC_AUDIT_QSPHERE_CONNECTION', 'qsphere'),
+        // Only these designations count as faculty (when Q-Sphere provides a designation); empty = everyone.
+        'faculty_designations' => env('ACADEMIC_AUDIT_FACULTY_DESIGNATIONS', '/professor|lecturer|teaching|faculty/i'),
+    ],
 
     // Source for pre-filling audit tables. Replace with IqacPrefillProvider after merge.
     'prefill_provider' => \Mmmut\AcademicAudit\Providers\NullPrefillProvider::class,
