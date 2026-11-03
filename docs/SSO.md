@@ -13,14 +13,21 @@ The Academic Audit Portal signs people in through the Q-Sphere IQAC portal, whic
 3. The portal checks `state`, exchanges the code at `/oauth/token` with the PKCE verifier and verifies the RS256
    `id_token` against `/oauth/jwks`: signature, `iss` = `SSO_ISSUER`, `aud` contains `SSO_CLIENT_ID`, `exp`, `nonce`.
    The JWKS is cached for an hour and fetched again when a token names an unknown `kid` (key rotation).
-4. The user is matched by **email, lower-case**. The Q-Sphere `sub` is stored in `users.sso_sub` and the name is
-   updated from the token.
-   * Known user with a role (or a faculty record): logged in, the active role is cleared (the role switcher starts from
-     the default role, as with the local login), and the session is marked as an SSO session. SSO users are not forced
-     to change their local password.
-   * Unknown user: an account is created **without** any `aa_user_roles` row, and the page "No access to the Academic
-     Audit yet – ask the IQAC" is shown (HTTP 403, not logged in). IQAC then finds the person under
-     Administration → Users & roles and gives a role.
+4. The user is matched by **email, lower-case**. The Q-Sphere `sub` is stored in `users.sso_sub` at the first central
+   login and must match afterwards: a login whose `sub` differs (e.g. an email address reassigned to someone else in
+   Q-Sphere) is refused with "already linked to a different central account" and logged. The name is updated from
+   the token.
+   * Known user with a role (or an active faculty record): logged in, the active role is cleared (the role switcher
+     starts from the default role, as with the local login), and the session is marked as an SSO session. SSO users
+     are not forced to change their local password.
+   * No role yet: the account is created if needed (random unknown password) and a default role is taken from the
+     claims: `qs_roles` contains `hod` → HOD, `faculty` → Faculty, for the department given by `dept_code`
+     (Q-Sphere code via `aa_department_aliases`, see the code table below). A faculty record is created for them.
+     IQAC and Auditor are never given automatically, and existing roles are never changed or removed.
+   * Otherwise the page "No access to the Academic Audit yet – ask the IQAC" is shown (HTTP 403, not logged in):
+     not HOD/faculty in Q-Sphere; department unknown or not audited (e.g. PHSTD, IKSD; the page says
+     "Q-Sphere में आपका विभाग दर्ज नहीं — IQAC से संपर्क करें"); or their faculty record is marked inactive.
+     IQAC then finds the person under Administration → Users & roles and gives a role.
 5. Sign-in problems (wrong state, refused login, bad token) show "Sign-in failed" with "Try again" and
    "Emergency login (IQAC)".
 

@@ -171,7 +171,8 @@ class Access
         if ($this->faculty === null) {
             $user = auth()->user();
             $this->faculty = $user
-                ? (Faculty::where('user_id', $user->id)->first() ?? ($user->email ? Faculty::where('email', $user->email)->first() : null)) ?? false
+                ? (Faculty::where('is_active', true)->where('user_id', $user->id)->first()
+                    ?? ($user->email ? Faculty::where('is_active', true)->where('email', $user->email)->first() : null)) ?? false
                 : false;
         }
 

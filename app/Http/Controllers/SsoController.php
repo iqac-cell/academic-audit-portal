@@ -4,23 +4,22 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\Sso\OidcClient;
+use App\Services\Sso\RoleProvisioner;
 use App\Services\Sso\SsoException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Mmmut\AcademicAudit\Models\Faculty;
-use Mmmut\AcademicAudit\Models\UserRole;
 use Mmmut\AcademicAudit\Support\Access;
+use Mmmut\AcademicAudit\Support\Passwords;
 
 /** Central login through Q-Sphere (OpenID Connect authorization code flow with PKCE). */
 class SsoController extends Controller
 {
     public const SESSION_VIA = 'auth.via';
 
-    public function __construct(private OidcClient $oidc) {}
+    public function __construct(private OidcClient $oidc, private RoleProvisioner $roles) {}
 
     public function redirect(Request $request)
     {
@@ -65,10 +64,16 @@ class SsoController extends Controller
         }
 
         $user = $this->findOrCreateUser($email, $claims);
-        if (! $this->hasAnyRole($user)) {
+        if (! $user) {
+            return $this->failed('This email address is already linked to a different central (Q-Sphere) account. '
+                .'Please contact the IQAC.');
+        }
+        $reason = $this->roles->hasAccess($user) ? null : $this->roles->provision($user, $claims);
+        if ($reason !== null) {
             return response()->view('auth.no-access', [
                 'email' => $email,
                 'name' => $user->name,
+                'reason' => $reason,
                 'contact' => app(\Mmmut\AcademicAudit\Services\SettingsService::class)->get('general.contact_email'),
                 'logoutUrl' => $this->oidc->logoutUrl(),
             ], 403);
@@ -122,27 +127,28 @@ class SsoController extends Controller
         return response('', 200, $headers);
     }
 
-    private function findOrCreateUser(string $email, array $claims): User
+    /**
+     * The account for this email. The Q-Sphere "sub" is stored at the first central login and must match
+     * afterwards, so an email address reassigned in Q-Sphere cannot take over an existing account (null).
+     */
+    private function findOrCreateUser(string $email, array $claims): ?User
     {
+        $sub = (string) $claims['sub'];
         $name = trim((string) ($claims['name'] ?? '')) ?: Str::before($email, '@');
         $user = User::whereRaw('LOWER(email) = ?', [$email])->first();
 
         if (! $user) {
-            $user = new User(['name' => $name, 'email' => $email, 'password' => Hash::make(Str::random(48))]);
-            $user->forceFill(['must_change_password' => false]);
+            $user = new User(['name' => $name, 'email' => $email]);
+            Passwords::setUnknown($user);
+        } elseif (filled($user->sso_sub) && ! hash_equals((string) $user->sso_sub, $sub)) {
+            Log::warning("SSO login refused for {$email}: Q-Sphere sub {$sub} differs from the linked sub {$user->sso_sub}.");
+            return null;
         } elseif (filled($claims['name'] ?? null)) {
             $user->name = $name;
         }
-        $user->forceFill(['sso_sub' => (string) $claims['sub']])->save();
+        $user->forceFill(['sso_sub' => $sub])->save();
 
         return $user;
-    }
-
-    private function hasAnyRole(User $user): bool
-    {
-        return UserRole::where('user_id', $user->id)->exists()
-            || Faculty::where('user_id', $user->id)->exists()
-            || Faculty::whereRaw('LOWER(email) = ?', [mb_strtolower($user->email)])->exists();
     }
 
     private function failed(string $message)

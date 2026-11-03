@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\Sso\Jwt;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Mmmut\AcademicAudit\Database\Seeders\AcademicAuditSeeder;
 use Mmmut\AcademicAudit\Models\Department;
 use Mmmut\AcademicAudit\Models\Faculty;
@@ -97,17 +98,76 @@ class SsoLoginTest extends TestCase
         $this->get(route('audit.dashboard'))->assertOk();
     }
 
-    public function test_unknown_user_is_created_without_roles_and_told_to_ask_iqac(): void
+    public function test_unknown_user_without_hod_or_faculty_role_is_told_to_ask_iqac(): void
     {
-        $res = $this->loginWith(['email' => 'New.Person@mmmut.ac.in', 'name' => 'New Person', 'sub' => 'qs-77']);
+        $res = $this->loginWith(['email' => 'New.Person@mmmut.ac.in', 'name' => 'New Person', 'sub' => 'qs-77', 'qs_roles' => ['student']]);
 
         $res->assertStatus(403)->assertSee('ask the IQAC', false)->assertSee('new.person@mmmut.ac.in');
         $this->assertGuest();
         $user = User::where('email', 'new.person@mmmut.ac.in')->first();
         $this->assertNotNull($user);
         $this->assertSame('qs-77', $user->sso_sub);
-        $this->assertFalse((bool) $user->must_change_password);
+        $this->assertFalse(Hash::check('Mmmut@123', $user->password));
         $this->assertSame(0, UserRole::where('user_id', $user->id)->count());
+        $this->assertSame(0, Faculty::count());
+    }
+
+    public function test_unknown_faculty_gets_faculty_role_for_their_department(): void
+    {
+        $res = $this->loginWith(['email' => 'asha@mmmut.ac.in', 'name' => 'Asha Verma', 'sub' => 'qs-5', 'qs_roles' => ['faculty'], 'dept_code' => 'CSED', 'employee_id' => 'E5']);
+
+        $res->assertRedirect(route('audit.dashboard'));
+        $user = User::where('email', 'asha@mmmut.ac.in')->first();
+        $this->assertAuthenticatedAs($user);
+        $cse = Department::where('short_name', 'CSE')->value('id');
+        $this->assertSame([['faculty', $cse]], UserRole::where('user_id', $user->id)->get()->map(fn ($r) => [$r->role, $r->department_id])->all());
+        $this->assertDatabaseHas('aa_faculty', ['user_id' => $user->id, 'department_id' => $cse, 'email' => 'asha@mmmut.ac.in', 'employee_code' => 'E5', 'is_active' => 1]);
+        $this->assertSame('faculty:'.$cse, app(Access::class)->active()['key']);
+        $this->get(route('audit.dashboard'))->assertOk();
+    }
+
+    public function test_unknown_hod_gets_hod_role_but_never_iqac_or_auditor(): void
+    {
+        $ece = Department::where('short_name', 'ECE')->value('id');
+        $this->loginWith(['email' => 'hod.ece@mmmut.ac.in', 'sub' => 'qs-8', 'qs_roles' => ['hod', 'faculty', 'iqac', 'auditor'], 'dept_code' => 'eced']);
+
+        $user = User::where('email', 'hod.ece@mmmut.ac.in')->first();
+        $this->assertAuthenticatedAs($user);
+        $this->assertEqualsCanonicalizing(['hod', 'faculty'], UserRole::where('user_id', $user->id)->pluck('role')->all());
+        $this->assertSame(0, UserRole::whereIn('role', ['iqac', 'auditor'])->where('user_id', $user->id)->count());
+        $this->assertSame('hod:'.$ece, app(Access::class)->active()['key']);
+        $this->assertSame($ece, Faculty::where('user_id', $user->id)->value('department_id'));
+    }
+
+    public function test_unknown_department_shows_hindi_message(): void
+    {
+        $this->loginWith(['email' => 'pharma@mmmut.ac.in', 'sub' => 'qs-9', 'qs_roles' => ['faculty'], 'dept_code' => 'PHSTD'])
+            ->assertStatus(403)->assertSee('Q-Sphere में आपका विभाग दर्ज नहीं — IQAC से संपर्क करें');
+        $this->assertGuest();
+        $this->assertSame(1, UserRole::count());
+    }
+
+    public function test_existing_roles_are_kept_and_nothing_is_added(): void
+    {
+        $this->loginWith(['qs_roles' => ['faculty'], 'dept_code' => 'MED']);
+        $this->assertAuthenticatedAs($this->hod);
+        $this->assertSame(['hod'], UserRole::where('user_id', $this->hod->id)->pluck('role')->all());
+    }
+
+    public function test_inactive_faculty_record_gives_no_access(): void
+    {
+        Faculty::create(['name' => 'Left', 'email' => 'left@mmmut.ac.in', 'department_id' => Department::where('short_name', 'CSE')->value('id'), 'is_active' => false]);
+        $this->loginWith(['email' => 'left@mmmut.ac.in', 'sub' => 'qs-10', 'qs_roles' => ['faculty'], 'dept_code' => 'CSED'])
+            ->assertStatus(403)->assertSee('no longer active');
+        $this->assertGuest();
+    }
+
+    public function test_login_with_a_different_sub_for_a_linked_email_is_refused(): void
+    {
+        $this->hod->forceFill(['sso_sub' => 'qs-42'])->save();
+        $this->loginWith(['sub' => 'qs-999'])->assertStatus(400)->assertSee('different central');
+        $this->assertGuest();
+        $this->assertSame('qs-42', $this->hod->fresh()->sso_sub);
     }
 
     public function test_faculty_record_counts_as_access(): void
