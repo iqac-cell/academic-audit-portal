@@ -38,10 +38,15 @@ class GrantRoleCommand extends Command
             $user = new $model;
             $user->forceFill([
                 'name' => $this->option('name') ?: $this->argument('email'),
-                'email' => $this->argument('email'),
-                'password' => Hash::make($this->option('password') ?: config('academic-audit.default_password')),
-            ])->save();
-            $this->info('User created.');
+                'email' => mb_strtolower($this->argument('email')),
+            ]);
+            if ($this->option('password')) {
+                $user->forceFill(['password' => Hash::make($this->option('password'))])->save();
+                $this->info('User created with the given password.');
+            } else {
+                \Mmmut\AcademicAudit\Support\Passwords::setUnknown($user)->save();
+                $this->info('User created. They sign in through the central login (or set a password with "Forgot password").');
+            }
         }
         UserRole::firstOrCreate(['user_id' => $user->id, 'role' => $role, 'department_id' => $dept?->id]);
         $this->info("{$user->email} is now ".UserRole::LABELS[$role].($dept ? " ({$dept->name})" : '').'.');

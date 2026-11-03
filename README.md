@@ -65,7 +65,7 @@ record linked to the login counts as the Faculty role. IQAC adds roles to a pers
 
 Each person's **Actions** menu on that page offers these options:
 - **Set new password**: typed, or generated and shown once, with an optional "must change at next login".
-- **Reset to default password**.
+- **Reset to temporary password**: a random password shown once, to be changed at the next local login.
 - **Email reset code** (when OTP reset is on).
 - **Delete user**.
 
@@ -109,7 +109,7 @@ Administration → Users & roles → **Import users from Excel**. Download the t
 Mobile; the "Help" sheet lists departments), upload it, check the preview (new / existing / error per row) and confirm.
 - Existing users only get the extra roles.
 - Faculty/HOD rows also create the faculty record.
-- New users get the default password and must change it at first login.
+- New users get no known password: they sign in through the central login or set one with "Forgot password".
 - Login details can be emailed when email is on.
 
 ### Daily task (reminders, auto-close)
@@ -145,8 +145,11 @@ php artisan audit:import-erp /path/to/Samarth_ERP.xlsx
 php artisan serve
 ```
 
-The default password for created accounts is `ACADEMIC_AUDIT_DEFAULT_PASSWORD` (default `Mmmut@123`). Every account
-created by the seeder, by the import or by IQAC must change its password at first login.
+There is no shared default password. Accounts created by the import, by `audit:grant` or by IQAC get a random password
+nobody knows: people sign in through the central login (Q-Sphere) or set a password with "Forgot password". The IQAC
+admin from the seeder gets `IQAC_ADMIN_PASSWORD` (set it before seeding). "Reset password" in Users & roles shows a
+random temporary password once, to be handed over personally; it must be changed at the next local login.
+`php artisan audit:default-password-check` (read-only) counts accounts that still have the old default `Mmmut@123`.
 
 ### Useful commands
 

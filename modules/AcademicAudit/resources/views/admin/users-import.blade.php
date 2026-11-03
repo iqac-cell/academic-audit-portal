@@ -2,7 +2,7 @@
 @section('title', 'Import users')
 @section('content')
 <h4>Import users from Excel</h4>
-<p class="small text-muted">Create logins and give roles to many people at once. Existing users (same email) only get the new roles — nothing is removed. New users get the default password and must change it at first login.</p>
+<p class="small text-muted">Create logins and give roles to many people at once. Existing users (same email) only get the new roles — nothing is removed. New users get no known password: they sign in through the central login (or set one with "Forgot password").</p>
 
 @if(! $rows)
     <div class="card shadow-sm" style="max-width: 760px">

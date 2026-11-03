@@ -15,7 +15,7 @@
 @endif
 
 <div class="card shadow-sm mb-3">
-    <div class="card-header bg-white"><strong>Assign a role</strong> <span class="small text-muted">— a new login is created with the default password if the email is not registered</span></div>
+    <div class="card-header bg-white"><strong>Assign a role</strong> <span class="small text-muted">— a new login (without a known password) is created if the email is not registered</span></div>
     <div class="card-body">
         <form method="post" action="{{ route('audit.admin.users.store') }}" class="row g-2 align-items-end">
             @csrf
@@ -54,8 +54,8 @@
                             <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#pwModal"
                                         data-action="{{ route('audit.admin.users.password', $p['user']->id) }}" data-name="{{ $p['user']->name }}" data-email="{{ $p['user']->email }}">
                                     <i class="bi bi-key"></i> Set new password</button></li>
-                            <li><form method="post" action="{{ route('audit.admin.users.reset', $p['user']->id) }}" onsubmit="return confirm(@json('Reset the password of '.$p['user']->name.' to the default password?'))">@csrf
-                                    <button class="dropdown-item"><i class="bi bi-arrow-counterclockwise"></i> Reset to default password</button></form></li>
+                            <li><form method="post" action="{{ route('audit.admin.users.reset', $p['user']->id) }}" onsubmit="return confirm(@json('Give '.$p['user']->name.' a new random temporary password (shown once)?'))">@csrf
+                                    <button class="dropdown-item"><i class="bi bi-arrow-counterclockwise"></i> Reset to temporary password</button></form></li>
                             @if($otpEnabled)
                                 <li><form method="post" action="{{ route('audit.admin.users.otp', $p['user']->id) }}">@csrf
                                         <button class="dropdown-item"><i class="bi bi-envelope"></i> Email reset code</button></form></li>

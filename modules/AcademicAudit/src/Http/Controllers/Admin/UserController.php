@@ -123,17 +123,16 @@ class UserController extends Controller
         $this->iqac();
         $model = config('academic-audit.user_model');
         $u = $model::findOrFail($user);
+        $password = \Mmmut\AcademicAudit\Support\Passwords::temporary();
         try {
-            $u->forceFill(['password' => Hash::make(config('academic-audit.default_password'))]);
-            if (\Illuminate\Support\Facades\Schema::hasColumn($u->getTable(), 'must_change_password')) {
-                $u->forceFill(['must_change_password' => true]);
-            }
-            $u->save();
+            \Mmmut\AcademicAudit\Support\Passwords::setTemporary($u, $password)->save();
         } catch (\Throwable $e) {
             return $this->failed('reset the password', $e);
         }
         $this->endSessions($u->id);
-        return back()->with('status', "Password of {$u->name} reset to the default password.");
+        $this->audit("Password of user {$u->email} reset to a temporary password by ".auth()->user()?->email);
+        return back()->with('status', "Temporary password for {$u->name} ({$u->email}): {$password} — shown only once. "
+            .'Give it to them personally; they must change it at their next local login. People with a central (Q-Sphere) login do not need it.');
     }
 
     /** Admin sets a new password (typed, or generated and shown once). */

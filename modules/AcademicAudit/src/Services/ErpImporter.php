@@ -120,13 +120,8 @@ class ErpImporter
             $user->forceFill([
                 'name' => $faculty->display_name,
                 'email' => $faculty->email,
-                'password' => Hash::make(config('academic-audit.default_password')),
             ]);
-            if (\Illuminate\Support\Facades\Schema::hasColumn($user->getTable(), 'must_change_password')
-                && app(\Mmmut\AcademicAudit\Services\SettingsService::class)->get('security.force_change')) {
-                $user->forceFill(['must_change_password' => true]);
-            }
-            $user->save();
+            \Mmmut\AcademicAudit\Support\Passwords::setUnknown($user)->save();
             $this->report['users_created']++;
         }
         $faculty->update(['user_id' => $user->id]);

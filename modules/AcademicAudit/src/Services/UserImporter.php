@@ -182,7 +182,9 @@ class UserImporter
                     $u->notify(new AuditMail('Your login for the Academic Audit portal', [
                         'An account has been created for you on the MMMUT Internal Academic Audit portal.',
                         "Login: {$u->email}",
-                        'Password: '.config('academic-audit.default_password').' (you will be asked to change it after the first login)',
+                        config('sso.enabled')
+                            ? 'Sign in with your MMMUT central login (Q-Sphere); no separate password is needed.'
+                            : 'To set your password, open the portal, choose "Forgot password" and enter this email address.',
                     ], 'Open portal', route('login')));
                     $result['mailed']++;
                 } catch (\Throwable $e) {
@@ -202,11 +204,8 @@ class UserImporter
             return [$user, false];
         }
         $user = new $model;
-        $user->forceFill(['name' => $name, 'email' => $email, 'password' => Hash::make(config('academic-audit.default_password'))]);
-        if (Schema::hasColumn($user->getTable(), 'must_change_password') && $this->settings->get('security.force_change')) {
-            $user->forceFill(['must_change_password' => true]);
-        }
-        $user->save();
+        $user->forceFill(['name' => $name, 'email' => $email]);
+        \Mmmut\AcademicAudit\Support\Passwords::setUnknown($user)->save();
         return [$user, true];
     }
 

@@ -27,7 +27,7 @@
     <div class="text-center mt-2"><a href="{{ route('password.request') }}" class="small">Forgot password?</a></div>
 @endif
 @unless($sso)
-<p class="small text-muted mt-3 mb-0">HODs and faculty sign in with their official @mmmut.ac.in email. First-time users must change the default password.
+<p class="small text-muted mt-3 mb-0">HODs and faculty sign in with their official @mmmut.ac.in email. First-time users set their password with "Forgot password".
     @unless($otpEnabled) Forgot password? Contact the IQAC office{{ $contact ? ' ('.$contact.')' : '' }}.@endunless</p>
 @endunless
 @endsection

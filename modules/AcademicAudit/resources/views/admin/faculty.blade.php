@@ -9,7 +9,7 @@
         <button class="btn btn-sm btn-success text-nowrap"><i class="bi bi-upload"></i> Import Samarth ERP export</button>
     </form>
 </div>
-<p class="small text-muted">Only "Teaching" cadre rows are imported. Each faculty member with an official email gets a login (default password, change on first login) and the Faculty role for their department.</p>
+<p class="small text-muted">Only "Teaching" cadre rows are imported. Each faculty member with an official email gets a login (no known password; they sign in through the central login or "Forgot password") and the Faculty role for their department.</p>
 <form method="get" class="d-flex gap-2 mb-2" style="max-width:640px">
     <input name="q" value="{{ request('q') }}" class="form-control form-control-sm" placeholder="Search name / email">
     <select name="department" class="form-select form-select-sm"><option value="">All departments</option>@foreach($departments as $d)<option value="{{ $d->id }}" @selected(request('department') == $d->id)>{{ $d->name }}</option>@endforeach</select>

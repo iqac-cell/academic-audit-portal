@@ -49,6 +49,7 @@ return [
         'V' => 'Annexure V – POs and PSOs attainment level and actions for improvement',
     ],
 
-    // Default password for accounts created by audit:import-erp (forced change on first login).
-    'default_password' => env('ACADEMIC_AUDIT_DEFAULT_PASSWORD', 'Mmmut@123'),
+    // No shared default password: new accounts get a random one (see Support\Passwords).
+    // A server-specific old default, only so that audit:default-password-check can look for it.
+    'legacy_default_password' => env('ACADEMIC_AUDIT_DEFAULT_PASSWORD'),
 ];

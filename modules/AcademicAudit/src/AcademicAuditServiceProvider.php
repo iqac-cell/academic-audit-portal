@@ -45,6 +45,7 @@ class AcademicAuditServiceProvider extends ServiceProvider
                 Console\GrantRoleCommand::class,
                 Console\RemindCommand::class,
                 Console\DirectoryCheckCommand::class,
+                Console\DefaultPasswordCheckCommand::class,
             ]);
         }
     }

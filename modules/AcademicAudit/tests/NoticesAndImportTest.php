@@ -139,9 +139,12 @@ class NoticesAndImportTest extends TestCase
         $this->post(route('audit.admin.users.import.confirm'));
         $this->assertSame($count, [User::count(), UserRole::count(), Faculty::count()]);
 
-        // the new user can log in and switch between HOD and Faculty
+        // no shared default password: the old one does not work; a password set later does
         $this->post(route('logout'));
-        $this->post('/login', ['email' => 'ravi.cse@mmmut.ac.in', 'password' => config('academic-audit.default_password')])->assertRedirect();
+        $this->post('/login', ['email' => 'ravi.cse@mmmut.ac.in', 'password' => 'Mmmut@123']);
+        $this->assertGuest();
+        $ravi->forceFill(['password' => \Illuminate\Support\Facades\Hash::make('Ravi-own-1')])->save();
+        $this->post('/login', ['email' => 'ravi.cse@mmmut.ac.in', 'password' => 'Ravi-own-1'])->assertRedirect();
         $this->assertAuthenticatedAs($ravi);
     }
 
