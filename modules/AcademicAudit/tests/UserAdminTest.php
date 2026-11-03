@@ -109,4 +109,28 @@ class UserAdminTest extends TestCase
         $this->post('/login', ['email' => 'fac@mmmut.ac.in', 'password' => $gen['password']])->assertRedirect();
         $this->assertAuthenticatedAs($this->fac);
     }
+
+    public function test_actions_still_work_when_the_log_file_is_not_writable(): void
+    {
+        \Illuminate\Support\Facades\Log::shouldReceive('info')->andThrow(new \UnexpectedValueException('The stream or file "laravel.log" could not be opened in append mode'));
+        \Illuminate\Support\Facades\Log::shouldReceive('error', 'warning', 'channel', 'stack')->andReturnNull();
+
+        $this->actingAs($this->iqac)->post(route('audit.admin.users.password', $this->fac->id), ['mode' => 'generate'])
+            ->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('generated_password');
+        $this->actingAs($this->iqac)->delete(route('audit.admin.users.destroy', $this->fac->id))
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertNull(User::find($this->fac->id));
+    }
+
+    public function test_database_error_is_shown_instead_of_500(): void
+    {
+        \Illuminate\Support\Facades\Schema::drop('aa_password_otps');
+        $this->actingAs($this->iqac)->delete(route('audit.admin.users.destroy', $this->fac->id))
+            ->assertRedirect()->assertSessionHasErrors('user');
+        // the transaction rolled back: nothing half-deleted
+        $this->assertNotNull(User::find($this->fac->id));
+        $this->assertSame(2, UserRole::where('user_id', $this->fac->id)->count());
+        $this->assertSame($this->fac->id, $this->faculty->fresh()->user_id);
+        $this->assertStringContainsString('Could not delete the user', session('errors')->first('user'));
+    }
 }

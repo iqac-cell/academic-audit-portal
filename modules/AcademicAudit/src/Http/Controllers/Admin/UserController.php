@@ -123,11 +123,15 @@ class UserController extends Controller
         $this->iqac();
         $model = config('academic-audit.user_model');
         $u = $model::findOrFail($user);
-        $u->forceFill(['password' => Hash::make(config('academic-audit.default_password'))]);
-        if (\Illuminate\Support\Facades\Schema::hasColumn($u->getTable(), 'must_change_password')) {
-            $u->forceFill(['must_change_password' => true]);
+        try {
+            $u->forceFill(['password' => Hash::make(config('academic-audit.default_password'))]);
+            if (\Illuminate\Support\Facades\Schema::hasColumn($u->getTable(), 'must_change_password')) {
+                $u->forceFill(['must_change_password' => true]);
+            }
+            $u->save();
+        } catch (\Throwable $e) {
+            return $this->failed('reset the password', $e);
         }
-        $u->save();
         $this->endSessions($u->id);
         return back()->with('status', "Password of {$u->name} reset to the default password.");
     }
@@ -145,13 +149,17 @@ class UserController extends Controller
         ]);
         $password = $data['mode'] === 'generate' ? $this->generatePassword() : $data['password'];
 
-        $u->forceFill(['password' => Hash::make($password)]);
-        if (\Illuminate\Support\Facades\Schema::hasColumn($u->getTable(), 'must_change_password')) {
-            $u->forceFill(['must_change_password' => $request->boolean('must_change')]);
+        try {
+            $u->forceFill(['password' => Hash::make($password)]);
+            if (\Illuminate\Support\Facades\Schema::hasColumn($u->getTable(), 'must_change_password')) {
+                $u->forceFill(['must_change_password' => $request->boolean('must_change')]);
+            }
+            $u->save();
+        } catch (\Throwable $e) {
+            return $this->failed('set the password', $e);
         }
-        $u->save();
         $this->endSessions($u->id);
-        \Illuminate\Support\Facades\Log::info("Password of user {$u->email} set by ".auth()->user()->email);
+        $this->audit("Password of user {$u->email} set by ".auth()->user()?->email);
 
         $back = back()->with('status', "New password set for {$u->name}.".($request->boolean('must_change') ? ' They must change it at next login.' : ''));
         return $data['mode'] === 'generate' ? $back->with('generated_password', ['name' => $u->name, 'email' => $u->email, 'password' => $password]) : $back;
@@ -178,26 +186,47 @@ class UserController extends Controller
             return back()->withErrors(['user' => "{$u->name} is an academic auditor of audits that are not locked yet ({$depts}). Assign another auditor first."]);
         }
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($u) {
-            UserRole::where('user_id', $u->id)->delete();
-            \Mmmut\AcademicAudit\Models\Faculty::where('user_id', $u->id)->update(['user_id' => null]);
-            \Illuminate\Support\Facades\DB::table('aa_password_otps')->where('email', $u->email)->delete();
-            $this->endSessions($u->id);
-            $u->delete();
-        });
-        \Illuminate\Support\Facades\Log::info("User {$u->email} deleted by ".auth()->user()->email);
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($u) {
+                UserRole::where('user_id', $u->id)->delete();
+                \Mmmut\AcademicAudit\Models\Faculty::where('user_id', $u->id)->update(['user_id' => null]);
+                \Illuminate\Support\Facades\DB::table('aa_password_otps')->where('email', $u->email)->delete();
+                $u->delete();
+            });
+        } catch (\Throwable $e) {
+            return $this->failed('delete the user', $e);
+        }
+        $this->endSessions($u->id);
+        $this->audit("User {$u->email} deleted by ".auth()->user()?->email);
         return back()->with('status', "{$u->name} ({$u->email}) deleted. Their entries in audits are kept.");
     }
 
-    /** Log the person out everywhere (sessions stored in the database). */
+    /**
+     * Log the person out everywhere (sessions stored in the database). Best effort: a problem here
+     * must not turn a completed password change or delete into an error page.
+     */
     private function endSessions(int $userId): void
     {
-        if (\Illuminate\Support\Facades\Schema::hasTable(config('session.table') ?: 'sessions')) {
-            \Illuminate\Support\Facades\DB::table(config('session.table') ?: 'sessions')->where('user_id', $userId)->delete();
+        foreach ([config('session.table') ?: 'sessions', 'sso_sessions'] as $table) {
+            rescue(function () use ($table, $userId) {
+                if (\Illuminate\Support\Facades\Schema::hasTable($table)) {
+                    \Illuminate\Support\Facades\DB::table($table)->where('user_id', $userId)->delete();
+                }
+            }, null, fn ($e) => rescue(fn () => report($e), null, false));
         }
-        if (\Illuminate\Support\Facades\Schema::hasTable('sso_sessions')) {
-            \Illuminate\Support\Facades\DB::table('sso_sessions')->where('user_id', $userId)->delete(); // Q-Sphere login sessions
-        }
+    }
+
+    /** Admin action trail in laravel.log; never fatal (e.g. when the log file is not writable). */
+    private function audit(string $message): void
+    {
+        rescue(fn () => \Illuminate\Support\Facades\Log::info($message), null, false);
+    }
+
+    /** Show what went wrong on the (IQAC-only) page instead of a bare 500. */
+    private function failed(string $what, \Throwable $e)
+    {
+        rescue(fn () => report($e), null, false);
+        return back()->withErrors(['user' => "Could not {$what}: ".class_basename($e).': '.mb_substr($e->getMessage(), 0, 400)]);
     }
 
     private function generatePassword(): string
