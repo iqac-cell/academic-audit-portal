@@ -8,6 +8,26 @@ use Mmmut\AcademicAudit\Models\Audit;
 /** Validation rules and option lists for a parameter's data table. */
 class ItemForm
 {
+    /** Links must be http(s): anything else (javascript:, data:, ...) is refused and never rendered as a link. */
+    public const HTTP_URL = '#^https?://[^\s<>"]+$#i';
+
+    public static function isHttpUrl(mixed $value): bool
+    {
+        return is_string($value) && preg_match(self::HTTP_URL, trim($value)) === 1;
+    }
+
+    /** Validation message for url columns, keyed like rules(). */
+    public static function messages(array $def, string $prefix = 'data.'): array
+    {
+        $out = [];
+        foreach ($def['columns'] as $c) {
+            if ($c['type'] === 'url') {
+                $out[$prefix.$c['key'].'.regex'] = 'The :attribute must start with http:// or https://.';
+            }
+        }
+        return $out;
+    }
+
     public static function rules(array $def, string $prefix = 'data.'): array
     {
         $rules = [];
@@ -16,7 +36,7 @@ class ItemForm
             $r = array_merge($r, match ($c['type']) {
                 'number' => ['numeric', 'min:0'],
                 'date' => ['date'],
-                'url' => ['string', 'max:1000'],
+                'url' => ['string', 'max:1000', 'regex:'.self::HTTP_URL],
                 'yn' => ['in:Y,N'],
                 'select' => [\Illuminate\Validation\Rule::in($c['options'])],
                 'textarea' => ['string', 'max:3000'],

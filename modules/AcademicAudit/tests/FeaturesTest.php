@@ -286,7 +286,7 @@ class FeaturesTest extends TestCase
         $this->app->bind(DocumentExtractor::class, fn () => new class implements DocumentExtractor {
             public function extract(array $definition, string $path, string $mimeType): array
             {
-                return ['data' => ['title' => 'Deep learning for crops', 'journal' => 'IEEE Access', 'year' => 2025, 'issn' => '2169-3536', 'link' => 'not a url but ok', 'bogus' => 'x'],
+                return ['data' => ['title' => 'Deep learning for crops', 'journal' => 'IEEE Access', 'year' => 2025, 'issn' => '2169-3536', 'link' => 'javascript:alert(document.cookie)', 'bogus' => 'x'],
                     'model' => 'fake', 'input_tokens' => 100, 'output_tokens' => 20];
             }
 
@@ -305,6 +305,7 @@ class FeaturesTest extends TestCase
         $res = $this->postJson($url, ['document' => $pdf()])->assertOk()->json();
         $this->assertSame('Deep learning for crops', $res['data']['title']);
         $this->assertArrayNotHasKey('bogus', $res['data']);
+        $this->assertArrayNotHasKey('link', $res['data']); // javascript: links are refused
         $this->assertNotEmpty($res['proof_token']);
         $this->postJson($url, ['document' => $pdf()])->assertStatus(429); // daily limit
 

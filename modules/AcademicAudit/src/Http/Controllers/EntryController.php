@@ -64,7 +64,7 @@ class EntryController extends Controller
         $asHod = $access->canEdit($audit);
         abort_unless($asHod || ($def['faculty'] && $access->canContribute($audit)), 403);
 
-        $request->validate(ItemForm::rules($def) + $this->proofRule($request, $audit, $code), [], ItemForm::attributes($def));
+        $request->validate(ItemForm::rules($def) + $this->proofRule($request, $audit, $code), ItemForm::messages($def), ItemForm::attributes($def));
         $data = ItemForm::clean($def, $request->input('data', []));
 
         $faculty = $asHod ? null : $access->faculty();
@@ -88,7 +88,7 @@ class EntryController extends Controller
         $this->viewable($audit);
         abort_unless($this->canModify($audit, $entry), 403);
         $def = $this->definition($entry->parameter_code);
-        $request->validate(ItemForm::rules($def) + $this->proofRule($request, $audit, $entry->parameter_code, $entry), [], ItemForm::attributes($def));
+        $request->validate(ItemForm::rules($def) + $this->proofRule($request, $audit, $entry->parameter_code, $entry), ItemForm::messages($def), ItemForm::attributes($def));
 
         $entry->data = ItemForm::clean($def, $request->input('data', []));
         if ($entry->status === Entry::REJECTED && ! $this->access()->canEdit($audit)) {
@@ -208,7 +208,7 @@ class EntryController extends Controller
             if ($n === 0 && in_array($data[$def['columns'][0]['key']] ?? null, ['', 'number', 'YYYY-MM-DD', 'Y / N'], true)) {
                 continue;
             }
-            $v = validator(['data' => $data], ItemForm::rules($def), [], ItemForm::attributes($def));
+            $v = validator(['data' => $data], ItemForm::rules($def), ItemForm::messages($def), ItemForm::attributes($def));
             if ($v->fails()) {
                 $errors[] = 'Row '.($n + 2).': '.implode(' ', $v->errors()->all());
                 continue;

@@ -71,7 +71,7 @@
                             @foreach($def['columns'] as $c)
                                 @php($v = \Mmmut\AcademicAudit\Support\ItemForm::display($c, $row->data[$c['key']] ?? null))
                                 <td class="small">
-                                    @if($c['type'] === 'url' && $v)<a href="{{ $v }}" target="_blank" rel="noopener">link</a>@else{{ $v }}@endif
+                                    @if($c['type'] === 'url' && \Mmmut\AcademicAudit\Support\ItemForm::isHttpUrl($v))<a href="{{ trim($v) }}" target="_blank" rel="noopener noreferrer">link</a>@else{{ $v }}@endif
                                 </td>
                             @endforeach
                             <td class="small">@if($row->proof_path)<a href="{{ route('audit.entries.proof', [$audit, $row]) }}"><i class="bi bi-paperclip"></i></a>@endif</td>

@@ -31,7 +31,7 @@ class ScalarController extends Controller
             $rules[$key] = match ($def['type']) {
                 'number' => 'nullable|numeric|min:0',
                 'yn' => 'nullable|in:Y,N',
-                'url' => 'nullable|string|max:500',
+                'url' => ['nullable', 'string', 'max:500', 'regex:'.\Mmmut\AcademicAudit\Support\ItemForm::HTTP_URL],
                 default => 'nullable|string|max:500',
             };
         }
