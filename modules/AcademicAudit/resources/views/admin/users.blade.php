@@ -5,6 +5,15 @@
     <h4 class="mb-0">Users &amp; roles</h4>
     <a href="{{ route('audit.admin.users.import') }}" class="btn btn-sm btn-success"><i class="bi bi-file-earmark-excel"></i> Import users from Excel</a>
 </div>
+@if($gen = session('generated_password'))
+    <div class="alert alert-success d-flex flex-wrap align-items-center gap-2">
+        <div>New password for <strong>{{ $gen['name'] }}</strong> ({{ $gen['email'] }}):</div>
+        <code class="fs-5 px-2 bg-white border rounded" id="genPw">{{ $gen['password'] }}</code>
+        <button type="button" class="btn btn-sm btn-outline-success" onclick="navigator.clipboard.writeText(document.getElementById('genPw').textContent); this.textContent='Copied'">Copy</button>
+        <div class="small text-muted w-100">This password is shown only once. Share it with the person privately.</div>
+    </div>
+@endif
+
 <div class="card shadow-sm mb-3">
     <div class="card-header bg-white"><strong>Assign a role</strong> <span class="small text-muted">— a new login is created with the default password if the email is not registered</span></div>
     <div class="card-body">
@@ -38,11 +47,28 @@
                         </span>
                     @endforeach
                 </td>
-                <td class="text-nowrap">
-                    @if($otpEnabled)
-                        <form class="d-inline" method="post" action="{{ route('audit.admin.users.otp', $p['user']->id) }}">@csrf <button class="btn btn-sm btn-outline-primary py-0">Email reset code</button></form>
-                    @endif
-                    <form class="d-inline" method="post" action="{{ route('audit.admin.users.reset', $p['user']->id) }}" onsubmit="return confirm('Reset password to the default password?')">@csrf <button class="btn btn-sm btn-outline-secondary py-0">Reset to default</button></form>
+                <td class="text-nowrap text-end">
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary py-0 dropdown-toggle" data-bs-toggle="dropdown">Actions</button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#pwModal"
+                                        data-action="{{ route('audit.admin.users.password', $p['user']->id) }}" data-name="{{ $p['user']->name }}" data-email="{{ $p['user']->email }}">
+                                    <i class="bi bi-key"></i> Set new password</button></li>
+                            <li><form method="post" action="{{ route('audit.admin.users.reset', $p['user']->id) }}" onsubmit="return confirm(@json('Reset the password of '.$p['user']->name.' to the default password?'))">@csrf
+                                    <button class="dropdown-item"><i class="bi bi-arrow-counterclockwise"></i> Reset to default password</button></form></li>
+                            @if($otpEnabled)
+                                <li><form method="post" action="{{ route('audit.admin.users.otp', $p['user']->id) }}">@csrf
+                                        <button class="dropdown-item"><i class="bi bi-envelope"></i> Email reset code</button></form></li>
+                            @endif
+                            @if((int) $p['user']->id !== (int) auth()->id())
+                                <li><hr class="dropdown-divider"></li>
+                                <li><form method="post" action="{{ route('audit.admin.users.destroy', $p['user']->id) }}"
+                                          onsubmit="return confirm(@json('Delete the login of '.$p['user']->name.' ('.$p['user']->email.')? All their roles are removed. Their entries in audits are kept. This cannot be undone.'))">
+                                        @csrf @method('delete')
+                                        <button class="dropdown-item text-danger"><i class="bi bi-trash"></i> Delete user</button></form></li>
+                            @endif
+                        </ul>
+                    </div>
                 </td>
             </tr>
         @empty
@@ -52,4 +78,43 @@
     </table>
 </div>
 <p class="small text-muted mt-2">One person can hold several roles (e.g. Faculty + HOD + Auditor). After login they choose the role to work in from the switcher at the top right. To add a role to an existing person, use their email in the form above.</p>
+<div class="modal fade" id="pwModal" tabindex="-1" aria-labelledby="pwTitle" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="post" id="pwForm" class="modal-content">
+            @csrf
+            <div class="modal-header"><h5 class="modal-title" id="pwTitle">Set new password</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <p class="small mb-2">For <strong id="pwName"></strong> <span class="text-muted" id="pwEmail"></span></p>
+                <div class="form-check"><input class="form-check-input" type="radio" name="mode" value="generate" id="pwGen" checked><label class="form-check-label" for="pwGen">Generate a strong password (shown once after saving)</label></div>
+                <div class="form-check mb-2"><input class="form-check-input" type="radio" name="mode" value="type" id="pwType"><label class="form-check-label" for="pwType">Type a password</label></div>
+                <div id="pwFields" class="d-none">
+                    <input type="password" name="password" class="form-control form-control-sm mb-2" placeholder="New password" autocomplete="new-password">
+                    <input type="password" name="password_confirmation" class="form-control form-control-sm mb-1" placeholder="Confirm new password" autocomplete="new-password">
+                    <div class="form-text mb-2">At least {{ max(6, (int) $settings->get('security.password_min')) }} characters with letters and numbers.</div>
+                </div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="must_change" value="1" id="pwMust" checked><label class="form-check-label" for="pwMust">Must change this password at next login</label></div>
+                <p class="small text-muted mt-2 mb-0">The person is logged out of any open sessions.
+                    @if(config('sso.enabled'))<br><strong>Central login (Q-Sphere) is on:</strong> users sign in with their Q-Sphere account; a local password is used only for the IQAC emergency login.@endif</p>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-sm btn-primary">Save password</button></div>
+        </form>
+    </div>
+</div>
+@push('scripts')
+<script>
+document.getElementById('pwModal').addEventListener('show.bs.modal', (ev) => {
+    const b = ev.relatedTarget;
+    document.getElementById('pwForm').action = b.dataset.action;
+    document.getElementById('pwName').textContent = b.dataset.name;
+    document.getElementById('pwEmail').textContent = '(' + b.dataset.email + ')';
+    document.getElementById('pwForm').reset();
+    document.getElementById('pwFields').classList.add('d-none');
+});
+document.querySelectorAll('#pwForm input[name=mode]').forEach(r => r.addEventListener('change', () => {
+    const typed = document.getElementById('pwType').checked;
+    document.getElementById('pwFields').classList.toggle('d-none', !typed);
+    document.querySelectorAll('#pwFields input').forEach(i => i.required = typed);
+}));
+</script>
+@endpush
 @endsection

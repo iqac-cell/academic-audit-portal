@@ -147,7 +147,7 @@
             <div class="card-header bg-white"><strong>Activity</strong></div>
             <ul class="list-group list-group-flush small">
                 @forelse($logs as $l)
-                    <li class="list-group-item"><span class="text-muted">{{ $l->created_at?->format('d-m-Y H:i') }}</span> · {{ $l->user?->name ?? 'System' }} · <strong>{{ $l->action }}</strong> {{ $l->detail }}</li>
+                    <li class="list-group-item"><span class="text-muted">{{ $l->created_at?->format('d-m-Y H:i') }}</span> · {{ $l->user?->name ?? ($l->user_id ? 'Deleted user' : 'System') }} · <strong>{{ $l->action }}</strong> {{ $l->detail }}</li>
                 @empty
                     <li class="list-group-item text-muted">No activity yet.</li>
                 @endforelse

@@ -81,6 +81,8 @@ Route::middleware(config('academic-audit.middleware'))
             Route::delete('roles/{role}', [C\Admin\UserController::class, 'destroy'])->name('roles.destroy');
             Route::post('users/{user}/reset-password', [C\Admin\UserController::class, 'resetPassword'])->name('users.reset');
             Route::post('users/{user}/send-otp', [C\Admin\UserController::class, 'sendOtp'])->name('users.otp');
+            Route::post('users/{user}/password', [C\Admin\UserController::class, 'setPassword'])->name('users.password');
+            Route::delete('users/{user}', [C\Admin\UserController::class, 'destroyUser'])->name('users.destroy');
 
             Route::get('notices', [C\Admin\NoticeController::class, 'index'])->name('notices');
             Route::post('notices', [C\Admin\NoticeController::class, 'store'])->name('notices.store');

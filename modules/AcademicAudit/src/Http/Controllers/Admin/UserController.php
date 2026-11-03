@@ -128,6 +128,88 @@ class UserController extends Controller
             $u->forceFill(['must_change_password' => true]);
         }
         $u->save();
+        $this->endSessions($u->id);
         return back()->with('status', "Password of {$u->name} reset to the default password.");
+    }
+
+    /** Admin sets a new password (typed, or generated and shown once). */
+    public function setPassword(Request $request, int $user, \Mmmut\AcademicAudit\Services\SettingsService $settings)
+    {
+        $this->iqac();
+        $model = config('academic-audit.user_model');
+        $u = $model::findOrFail($user);
+        $data = $request->validate([
+            'mode' => 'required|in:type,generate',
+            'password' => ['exclude_unless:mode,type', 'required', 'confirmed',
+                \Illuminate\Validation\Rules\Password::min(max(6, (int) $settings->get('security.password_min')))->letters()->numbers()],
+        ]);
+        $password = $data['mode'] === 'generate' ? $this->generatePassword() : $data['password'];
+
+        $u->forceFill(['password' => Hash::make($password)]);
+        if (\Illuminate\Support\Facades\Schema::hasColumn($u->getTable(), 'must_change_password')) {
+            $u->forceFill(['must_change_password' => $request->boolean('must_change')]);
+        }
+        $u->save();
+        $this->endSessions($u->id);
+        \Illuminate\Support\Facades\Log::info("Password of user {$u->email} set by ".auth()->user()->email);
+
+        $back = back()->with('status', "New password set for {$u->name}.".($request->boolean('must_change') ? ' They must change it at next login.' : ''));
+        return $data['mode'] === 'generate' ? $back->with('generated_password', ['name' => $u->name, 'email' => $u->email, 'password' => $password]) : $back;
+    }
+
+    public function destroyUser(int $user)
+    {
+        $this->iqac();
+        $model = config('academic-audit.user_model');
+        $u = $model::findOrFail($user);
+
+        if ((int) $u->id === (int) auth()->id()) {
+            return back()->withErrors(['user' => 'You cannot delete your own account.']);
+        }
+        $iqacIds = UserRole::where('role', UserRole::IQAC)->pluck('user_id')->unique();
+        if ($iqacIds->contains($u->id) && $iqacIds->count() <= 1) {
+            return back()->withErrors(['user' => 'This is the last IQAC administrator and cannot be deleted.']);
+        }
+        $open = \Mmmut\AcademicAudit\Models\Audit::with('department', 'cycle')
+            ->where(fn ($q) => $q->where('auditor1_user_id', $u->id)->orWhere('auditor2_user_id', $u->id))
+            ->where('status', '!=', \Mmmut\AcademicAudit\Models\Audit::LOCKED)->get();
+        if ($open->isNotEmpty()) {
+            $depts = $open->map(fn ($a) => ($a->department->short_name ?: $a->department->name).' '.$a->cycle?->academic_year)->implode(', ');
+            return back()->withErrors(['user' => "{$u->name} is an academic auditor of audits that are not locked yet ({$depts}). Assign another auditor first."]);
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($u) {
+            UserRole::where('user_id', $u->id)->delete();
+            \Mmmut\AcademicAudit\Models\Faculty::where('user_id', $u->id)->update(['user_id' => null]);
+            \Illuminate\Support\Facades\DB::table('aa_password_otps')->where('email', $u->email)->delete();
+            $this->endSessions($u->id);
+            $u->delete();
+        });
+        \Illuminate\Support\Facades\Log::info("User {$u->email} deleted by ".auth()->user()->email);
+        return back()->with('status', "{$u->name} ({$u->email}) deleted. Their entries in audits are kept.");
+    }
+
+    /** Log the person out everywhere (sessions stored in the database). */
+    private function endSessions(int $userId): void
+    {
+        if (\Illuminate\Support\Facades\Schema::hasTable(config('session.table') ?: 'sessions')) {
+            \Illuminate\Support\Facades\DB::table(config('session.table') ?: 'sessions')->where('user_id', $userId)->delete();
+        }
+        if (\Illuminate\Support\Facades\Schema::hasTable('sso_sessions')) {
+            \Illuminate\Support\Facades\DB::table('sso_sessions')->where('user_id', $userId)->delete(); // Q-Sphere login sessions
+        }
+    }
+
+    private function generatePassword(): string
+    {
+        $letters = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
+        $digits = '23456789';
+        $pool = $letters.$digits;
+        $chars = [$letters[random_int(0, strlen($letters) - 1)], $digits[random_int(0, strlen($digits) - 1)]];
+        while (count($chars) < 10) {
+            $chars[] = $pool[random_int(0, strlen($pool) - 1)];
+        }
+        shuffle($chars);
+        return implode('', $chars);
     }
 }

@@ -63,6 +63,20 @@ the role to work in from the switcher at the top right. Every permission follows
 HOD who is also an auditor sees the departments assigned to them for audit only while working as Auditor. A faculty
 record linked to the login counts as the Faculty role. IQAC adds roles to a person in Administration → Users & roles.
 
+Each person's **Actions** menu on that page offers these options:
+- **Set new password**: typed, or generated and shown once, with an optional "must change at next login".
+- **Reset to default password**.
+- **Email reset code** (when OTP reset is on).
+- **Delete user**.
+
+Setting a password or deleting a user logs the person out of open sessions. Deleting removes the login and all roles. The
+person's faculty record and audit entries are kept, and the activity log shows "Deleted user".
+
+Deletion is refused for these accounts:
+- Your own account.
+- The last IQAC administrator.
+- An academic auditor of an audit that is not locked yet. Assign another auditor first.
+
 ## Portal settings (IQAC → Administration → Portal settings)
 
 | Tab | What it controls |
