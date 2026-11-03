@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ->middleware('throttle:60,1')->name('sso.backchannel-logout'),
     )
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
         $middleware->web(append: [\App\Http\Middleware\ForcePasswordChange::class]);
         $middleware->redirectUsersTo(fn () => route('audit.dashboard'));
     })

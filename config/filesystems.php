@@ -33,7 +33,8 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // Proofs and annexures are downloaded only through the permission checks in the module.
+            'serve' => false,
             'throw' => false,
             'report' => false,
         ],

@@ -47,6 +47,7 @@ class ReportController extends Controller
     {
         abort_unless($this->access()->isIqac() || $this->access()->isAuditor(), 403);
         $cycle = $request->filled('cycle') ? Cycle::findOrFail($request->cycle) : Cycle::current();
+        abort_unless($cycle, 404, 'No audit cycle has been created yet.');
         return $this->xlsx($reports->universityExcel($cycle), "academic-audit-{$cycle->academic_year}-summary.xlsx");
     }
 

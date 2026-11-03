@@ -5,11 +5,15 @@ namespace Mmmut\AcademicAudit\Services;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Mmmut\AcademicAudit\Notifications\AuditMail;
 
 /** One-time codes sent by email for resetting a forgotten password. */
 class PasswordOtpService
 {
+    /** At most this many codes per email address per hour (on top of the per-IP route throttle). */
+    public const ISSUES_PER_HOUR = 5;
+
     public function __construct(private SettingsService $settings) {}
 
     public function enabled(): bool
@@ -24,6 +28,11 @@ class PasswordOtpService
             return false;
         }
         $email = mb_strtolower(trim($email));
+        $limiter = 'audit-otp-issue:'.sha1($email);
+        if (RateLimiter::tooManyAttempts($limiter, self::ISSUES_PER_HOUR)) {
+            return false;
+        }
+        RateLimiter::hit($limiter, 3600);
         $model = config('academic-audit.user_model');
         $user = $model::where('email', $email)->first();
         if (! $user) {
@@ -33,10 +42,13 @@ class PasswordOtpService
         $code = str_pad((string) random_int(0, 10 ** $digits - 1), $digits, '0', STR_PAD_LEFT);
         $minutes = max(1, (int) $this->settings->get('security.otp_expiry'));
 
+        // Wrong guesses carry over to the new code, so asking for a new code does not reset the attempt limit.
+        $attempts = (int) DB::table('aa_password_otps')->where('email', $email)->whereNull('used_at')
+            ->where('created_at', '>=', now()->subHour())->max('attempts');
         DB::table('aa_password_otps')->where('email', $email)->whereNull('used_at')->delete();
         DB::table('aa_password_otps')->insert([
             'email' => $email, 'code_hash' => Hash::make($code), 'expires_at' => now()->addMinutes($minutes),
-            'attempts' => 0, 'ip' => $ip, 'created_at' => now(), 'updated_at' => now(),
+            'attempts' => $attempts, 'ip' => $ip, 'created_at' => now(), 'updated_at' => now(),
         ]);
         try {
             $user->notify(new AuditMail('Password reset code – Academic Audit portal', [

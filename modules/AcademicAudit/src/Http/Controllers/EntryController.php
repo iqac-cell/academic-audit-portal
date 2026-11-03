@@ -129,7 +129,11 @@ class EntryController extends Controller
     public function proof(Audit $audit, Entry $entry)
     {
         $this->viewable($audit);
-        abort_unless($entry->proof_path, 404);
+        abort_unless($entry->audit_id === $audit->id && $entry->proof_path, 404);
+        $access = $this->access();
+        if (! $access->isIqac() && ! $access->isHodOf($audit) && ! $access->isAuditorOf($audit)) {
+            abort_unless($entry->faculty_id !== null && $entry->faculty_id === $access->faculty()?->id, 403);
+        }
         return Storage::disk(config('academic-audit.disk'))->download($entry->proof_path);
     }
 
