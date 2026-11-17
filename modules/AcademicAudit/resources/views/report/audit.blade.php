@@ -74,15 +74,14 @@
 <div class="item-title">f) Student Information</div>
 <div>i) Sanction Intake Approved by Governing Body</div>
 <table><tr><th>Program</th><th>Approved Governing body AICTE/PCI/University, etc</th><th>Total Students as per sanctioned Intake (TS)</th></tr>
-    @foreach(['UG', 'PG'] as $l)<tr><td>{{ $levels[$l] }}</td><td>{{ $info['sanctioned'][$l]['body'] ?? '' }}</td><td>{{ $info['sanctioned'][$l]['ts'] ?? '' }}</td></tr>@endforeach
+    @forelse($info['sanctioned'] as $r)<tr><td>{{ $r['program'] ?? '' }}</td><td>{{ $r['body'] ?? '' }}</td><td>{{ $r['ts'] ?? '' }}</td></tr>@empty<tr><td colspan="3">&nbsp;</td></tr>@endforelse
 </table>
 <div>ii) Student Enrolled (Annexure-I)</div>
 <table><tr><th rowspan="2">Program</th><th colspan="5">Number of Students Enrolled</th></tr>
     <tr>@foreach(Catalogue::YEARS as $y)<th>{{ $y }}</th>@endforeach<th>Total</th></tr>
-    @foreach($levels as $l => $label)
-        @php($en = $info['enrolled'][$l] ?? [])
-        <tr><td>{{ $label }}</td>@foreach(Catalogue::YEARS as $y)<td class="r">{{ $en[$y] ?? '' }}</td>@endforeach<td class="r">{{ array_sum(array_map('floatval', $en)) ?: '' }}</td></tr>
-    @endforeach
+    @forelse($info['enrolled'] as $r)
+        <tr><td>{{ $r['program'] ?? '' }}</td>@foreach(Catalogue::YEARS as $y)<td class="r">{{ $r['counts'][$y] ?? '' }}</td>@endforeach<td class="r">{{ \Mmmut\AcademicAudit\Support\BasicInfo::total($r['counts']) ?: '' }}</td></tr>
+    @empty<tr><td colspan="6">&nbsp;</td></tr>@endforelse
 </table>
 
 @foreach($sections as $sec => $items)

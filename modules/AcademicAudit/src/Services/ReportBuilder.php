@@ -24,7 +24,7 @@ class ReportBuilder
 
         return [
             'audit' => $audit,
-            'info' => $audit->basic_info ?? [],
+            'info' => \Mmmut\AcademicAudit\Support\BasicInfo::normalize($audit->basic_info ?? []),
             'scalars' => $this->scores->scalars($audit),
             'eval' => $eval,
             'summary' => $this->scores->summary($audit, $eval),

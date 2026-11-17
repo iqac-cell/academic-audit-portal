@@ -14,23 +14,30 @@
                     <div class="form-control form-control-sm bg-light">{{ $def['metric']['symbol'] }} · scoring: {{ $param->scoring }}</div></div>
             </div>
             @if($param->scoring === 'slab')
-                <label class="form-label">Slabs (checked top to bottom; the first condition met gives the marks; none met → 0)</label>
-                <table class="table table-sm">
-                    <thead><tr><th>Condition</th><th>Threshold</th><th>Marks</th></tr></thead>
-                    <tbody>
-                    @php($slabs = $param->slabs->values())
-                    @for($i = 0; $i < $slabs->count() + 3; $i++)
-                        <tr>
-                            <td><select name="slabs[{{ $i }}][op]" class="form-select form-select-sm">
-                                    <option value="gt" @selected(($slabs[$i]->op ?? 'gt') === 'gt')>{{ $def['metric']['symbol'] }} &gt;</option>
-                                    <option value="gte" @selected(($slabs[$i]->op ?? '') === 'gte')>{{ $def['metric']['symbol'] }} ≥</option>
-                                </select></td>
-                            <td><input type="number" step="any" name="slabs[{{ $i }}][threshold]" value="{{ isset($slabs[$i]) ? \Mmmut\AcademicAudit\Support\Fmt::value($slabs[$i]->threshold, 4) : '' }}" class="form-control form-control-sm"></td>
-                            <td><input type="number" step="0.5" name="slabs[{{ $i }}][marks]" value="{{ isset($slabs[$i]) ? \Mmmut\AcademicAudit\Support\Fmt::marks($slabs[$i]->marks) : '' }}" class="form-control form-control-sm"></td>
-                        </tr>
-                    @endfor
-                    </tbody>
-                </table>
+                @include('audit::partials.repeat-rows')
+                @php($slabs = $param->slabs->values())
+                @php($slabRow = function ($i, $s = null) use ($def) {
+                    $op = $s->op ?? 'gt';
+                    return '<tr data-row><td><select name="slabs['.$i.'][op]" class="form-select form-select-sm">'
+                        .'<option value="gt"'.($op === 'gt' ? ' selected' : '').'>'.e($def['metric']['symbol']).' &gt;</option>'
+                        .'<option value="gte"'.($op === 'gte' ? ' selected' : '').'>'.e($def['metric']['symbol']).' ≥</option></select></td>'
+                        .'<td><input type="number" step="any" name="slabs['.$i.'][threshold]" value="'.e($s ? \Mmmut\AcademicAudit\Support\Fmt::value($s->threshold, 4) : '').'" class="form-control form-control-sm"></td>'
+                        .'<td><input type="number" step="0.5" name="slabs['.$i.'][marks]" value="'.e($s ? \Mmmut\AcademicAudit\Support\Fmt::marks($s->marks) : '').'" class="form-control form-control-sm"></td>'
+                        .'<td class="align-middle"><button type="button" class="btn btn-sm btn-link text-danger p-0" data-remove-row title="Remove slab"><i class="bi bi-x-lg"></i></button></td></tr>';
+                })
+                <div data-repeat data-next="{{ max($slabs->count(), 1) }}">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <label class="form-label mb-1">Slabs (checked top to bottom; the first condition met gives the marks; none met → 0)</label>
+                        <button type="button" class="btn btn-sm btn-outline-primary mb-1" data-add-row><i class="bi bi-plus-lg"></i> Add slab</button>
+                    </div>
+                    <table class="table table-sm">
+                        <thead><tr><th>Condition</th><th>Threshold</th><th>Marks</th><th></th></tr></thead>
+                        <tbody>
+                        @forelse($slabs as $i => $s){!! $slabRow($i, $s) !!}@empty{!! $slabRow(0) !!}@endforelse
+                        </tbody>
+                    </table>
+                    <template>{!! $slabRow('__i__') !!}</template>
+                </div>
             @endif
             <label class="form-label">Note shown to departments</label>
             <textarea name="notes" rows="2" class="form-control form-control-sm mb-3">{{ old('notes', $param->notes) }}</textarea>

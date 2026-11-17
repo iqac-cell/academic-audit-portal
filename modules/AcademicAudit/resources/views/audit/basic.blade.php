@@ -2,6 +2,7 @@
 @section('title', 'Basic Information')
 @section('content')
 @include('audit::partials.audit-header')
+@include('audit::partials.repeat-rows')
 <div class="row">
     <div class="col-lg-3 d-none d-lg-block">@include('audit::partials.audit-nav', ['current' => 'basic'])</div>
     <div class="col-lg-9">
@@ -23,82 +24,81 @@
                 <textarea name="mission" rows="3" class="form-control form-control-sm">{{ old('mission', $info['mission'] ?? '') }}</textarea>
             </div></div>
 
-            <div class="card shadow-sm mb-3">
-                <div class="card-header bg-white"><strong>d) Programs offered</strong> <span class="small text-muted">— these names appear as choices in program-wise tables</span></div>
-                <table class="table table-sm mb-0">
-                    <thead class="table-light"><tr><th>SN</th><th>Name of Program</th><th>Level</th><th>Approved Intake</th><th>Year of Starting</th></tr></thead>
-                    <tbody>
-                    @php($programs = array_values($info['programs'] ?? []))
-                    @for($i = 0; $i < max(count($programs) + 2, 4); $i++)
-                        <tr>
-                            <td>{{ $i + 1 }}</td>
-                            <td><input name="programs[{{ $i }}][name]" value="{{ $programs[$i]['name'] ?? '' }}" class="form-control form-control-sm" placeholder="e.g. B.Tech. Civil Engineering"></td>
-                            <td><select name="programs[{{ $i }}][level]" class="form-select form-select-sm">
-                                    @foreach($levels as $k => $l)<option value="{{ $k }}" @selected(($programs[$i]['level'] ?? '') === $k)>{{ $k }}</option>@endforeach
-                                </select></td>
-                            <td><input type="number" min="0" name="programs[{{ $i }}][intake]" value="{{ $programs[$i]['intake'] ?? '' }}" class="form-control form-control-sm"></td>
-                            <td><input type="number" name="programs[{{ $i }}][year]" value="{{ $programs[$i]['year'] ?? '' }}" class="form-control form-control-sm"></td>
-                        </tr>
-                    @endfor
-                    </tbody>
-                </table>
-            </div>
+            @php($row = fn ($kind, $i, $r = []) => view('audit::partials.basic-row', ['kind' => $kind, 'i' => $i, 'row' => $r, 'levels' => $levels, 'years' => $years]))
+            @php($addBtn = '<button type="button" class="btn btn-sm btn-outline-primary" data-add-row><i class="bi bi-plus-lg"></i> Add row</button>')
+            <datalist id="aa-program-names">
+                @foreach(collect($info['programs'])->pluck('name')->filter()->merge(array_values($levels))->unique() as $n)<option value="{{ $n }}">@endforeach
+            </datalist>
 
-            <div class="card shadow-sm mb-3">
-                <div class="card-header bg-white"><strong>e) Faculty Information</strong></div>
+            <div class="card shadow-sm mb-3" data-repeat data-next="{{ max(count($info['programs']), 1) }}">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <span><strong>d) Programs offered</strong> <span class="small text-muted">— these names appear as choices in program-wise tables</span></span>
+                    @if($canEdit){!! $addBtn !!}@endif
+                </div>
                 <div class="table-responsive">
                 <table class="table table-sm mb-0">
-                    <thead class="table-light"><tr><th>SN</th><th>Name of Faculty</th><th>Highest Qualification</th><th>Years of Experience</th><th>Date of Joining University</th></tr></thead>
+                    <thead class="table-light"><tr><th>SN</th><th>Name of Program</th><th>Level</th><th>Approved Intake</th><th>Year of Starting</th><th></th></tr></thead>
                     <tbody>
-                    @php($fac = array_values($info['faculty'] ?? []))
-                    @for($i = 0; $i < count($fac) + 2; $i++)
-                        <tr>
-                            <td>{{ $i + 1 }}</td>
-                            <td><input name="faculty[{{ $i }}][name]" value="{{ $fac[$i]['name'] ?? '' }}" class="form-control form-control-sm"></td>
-                            <td><input name="faculty[{{ $i }}][qualification]" value="{{ $fac[$i]['qualification'] ?? '' }}" class="form-control form-control-sm"></td>
-                            <td><input type="number" min="0" step="any" name="faculty[{{ $i }}][experience]" value="{{ $fac[$i]['experience'] ?? '' }}" class="form-control form-control-sm"></td>
-                            <td><input name="faculty[{{ $i }}][doj]" value="{{ $fac[$i]['doj'] ?? '' }}" class="form-control form-control-sm" placeholder="dd-mm-yyyy"></td>
-                        </tr>
-                    @endfor
+                    @forelse($info['programs'] as $i => $p){!! $row('programs', $i, $p) !!}@empty{!! $row('programs', 0) !!}@endforelse
                     </tbody>
                 </table>
                 </div>
+                <template>{!! $row('programs', '__i__') !!}</template>
+            </div>
+
+            <div class="card shadow-sm mb-3" data-repeat data-next="{{ max(count($info['faculty']), 1) }}">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <strong>e) Faculty Information</strong>
+                    @if($canEdit){!! $addBtn !!}@endif
+                </div>
+                <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light"><tr><th>SN</th><th>Name of Faculty</th><th>Highest Qualification</th><th>Years of Experience</th><th>Date of Joining University</th><th></th></tr></thead>
+                    <tbody>
+                    @forelse($info['faculty'] as $i => $f){!! $row('faculty', $i, $f) !!}@empty{!! $row('faculty', 0) !!}@endforelse
+                    </tbody>
+                </table>
+                </div>
+                <template>{!! $row('faculty', '__i__') !!}</template>
             </div>
 
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-white"><strong>f) Student Information</strong></div>
                 <div class="card-body">
-                    <h6 class="small fw-semibold">i) Sanctioned Intake Approved by Governing Body</h6>
-                    <table class="table table-sm table-bordered">
-                        <thead class="table-light"><tr><th>Program</th><th>Approved Governing body (AICTE/PCI/University, etc)</th><th>Total Students as per sanctioned Intake (TS)</th></tr></thead>
-                        <tbody>
-                        @foreach(['UG', 'PG'] as $lvl)
-                            <tr>
-                                <td>{{ $levels[$lvl] }}</td>
-                                <td><input name="sanctioned[{{ $lvl }}][body]" value="{{ $info['sanctioned'][$lvl]['body'] ?? '' }}" class="form-control form-control-sm"></td>
-                                <td><input type="number" min="0" name="sanctioned[{{ $lvl }}][ts]" value="{{ $info['sanctioned'][$lvl]['ts'] ?? '' }}" class="form-control form-control-sm"></td>
-                            </tr>
-                        @endforeach
-                        </tbody>
-                    </table>
-                    <p class="small text-muted">B.Tech. total students = sanctioned intake including lateral entry for second, third and final year. For other programs, total students for all years including lateral entry.</p>
+                    @php($sanctioned = \Mmmut\AcademicAudit\Support\BasicInfo::formSanctioned($info))
+                    <div data-repeat data-next="{{ count($sanctioned) }}">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <h6 class="small fw-semibold mb-0">i) Sanctioned Intake Approved by Governing Body</h6>
+                            @if($canEdit){!! $addBtn !!}@endif
+                        </div>
+                        <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light"><tr><th>SN</th><th>Program</th><th>Approved Governing body (AICTE/PCI/University, etc)</th><th>Total Students as per sanctioned Intake (TS)</th><th></th></tr></thead>
+                            <tbody>
+                            @foreach($sanctioned as $i => $r){!! $row('sanctioned', $i, $r) !!}@endforeach
+                            </tbody>
+                        </table>
+                        </div>
+                        <template>{!! $row('sanctioned', '__i__') !!}</template>
+                    </div>
+                    <p class="small text-muted">B.Tech. total students = sanctioned intake including lateral entry for second, third and final year. For other programs, total students for all years including lateral entry. Add one row per program or programme group as needed.</p>
 
-                    <h6 class="small fw-semibold">ii) Students Enrolled <span class="text-muted">(detailed list as Annexure I)</span></h6>
-                    <table class="table table-sm table-bordered mb-0">
-                        <thead class="table-light"><tr><th>Program</th>@foreach($years as $y)<th>{{ $y }}</th>@endforeach<th>Total</th></tr></thead>
-                        <tbody>
-                        @foreach($levels as $lvl => $label)
-                            @php($en = $info['enrolled'][$lvl] ?? [])
-                            <tr>
-                                <td>{{ $label }}</td>
-                                @foreach($years as $y)
-                                    <td><input type="number" min="0" name="enrolled[{{ $lvl }}][{{ $y }}]" value="{{ $en[$y] ?? '' }}" class="form-control form-control-sm"></td>
-                                @endforeach
-                                <td class="fw-semibold">{{ array_sum(array_map('floatval', $en)) ?: '' }}</td>
-                            </tr>
-                        @endforeach
-                        </tbody>
-                    </table>
+                    @php($enrolled = \Mmmut\AcademicAudit\Support\BasicInfo::formEnrolled($info))
+                    <div data-repeat data-next="{{ count($enrolled) }}">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <h6 class="small fw-semibold mb-0">ii) Students Enrolled <span class="text-muted">(detailed list as Annexure I)</span></h6>
+                            @if($canEdit){!! $addBtn !!}@endif
+                        </div>
+                        <div class="table-responsive">
+                        <table class="table table-sm table-bordered mb-0">
+                            <thead class="table-light"><tr><th>SN</th><th>Program</th>@foreach($years as $y)<th>{{ $y }}</th>@endforeach<th>Total</th><th></th></tr></thead>
+                            <tbody>
+                            @foreach($enrolled as $i => $r){!! $row('enrolled', $i, $r) !!}@endforeach
+                            </tbody>
+                        </table>
+                        </div>
+                        <template>{!! $row('enrolled', '__i__') !!}</template>
+                    </div>
                 </div>
             </div>
             </fieldset>
